@@ -13,6 +13,21 @@ local Window = WindUI:CreateWindow({
     SideBarWidth = 200,  
     MinimizeKey = Enum.KeyCode.RightControl  
 })  
+
+-- AGORA VAI: Chamando a função direto da sua Window criada
+Window:EditOpenButton({
+    Title = "Open Menu",
+    Icon = "zap",
+    CornerRadius = UDim.new(0, 16),
+    StrokeThickness = 2,
+    Color = ColorSequence.new(
+        Color3.fromHex("FF0000"), -- Vermelho Puro Hex
+        Color3.fromHex("FF0000")  -- Vermelho Puro Hex
+    ),
+    OnlyMobile = false,
+    Enabled = true,
+    Draggable = true,
+})
   
 -- Serviços  
 local Players = game:GetService("Players")  
@@ -388,7 +403,7 @@ EspTab:Toggle({
 })  
   
 -- ====================================================================  
--- TELEPORTES (LOGICA RAYFIELD IMPORTADA)  
+-- TELEPORTES  
 -- ====================================================================  
   
 -- 1. Murderer  
@@ -463,7 +478,7 @@ TeleportTab:Button({
     end  
 })  
   
--- 7. Teleportar para game arena (CÓPIA DA LÓGICA DO RAYFIELD)  
+-- 7. Teleportar para game arena  
 TeleportTab:Button({  
     Title = "TP Arena de Jogo",  
     Callback = function()  
