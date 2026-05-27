@@ -22,7 +22,7 @@ Window:EditOpenButton({
     StrokeThickness = 2,
     Color = ColorSequence.new(
         Color3.fromHex("FF0000"), -- Vermelho Puro Hex
-        Color3.fromHex("FF0000")  -- Vermelho Puro Hex
+        Color3.fromHex("FFFFFF")  -- Vermelho Puro Hex
     ),
     OnlyMobile = false,
     Enabled = true,
