@@ -33,6 +33,7 @@ Draggable = true,
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Lighting = game:GetService("Lighting")
+local TweenService = game:GetService("TweenService")
 
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
@@ -167,38 +168,84 @@ local hrp = LocalPlayer.Character.HumanoidRootPart
 
 for _, obj in ipairs(workspace:GetDescendants()) do
 
-if obj:IsA("BasePart")    
-and obj.Parent    
-and obj.Transparency < 1 then    
+if obj:IsA("BasePart")
+and obj.Parent
+and obj.Transparency < 1 then
 
-    local name = string.lower(obj.Name)    
+local name = string.lower(obj.Name)
 
-    if name:find("coin")    
-    or name:find("gold")    
-    or name:find("token") then    
+if name:find("coin")
+or name:find("gold")
+or name:find("token") then
 
-        -- evita partes falsas do mapa    
-        if obj.Size.X <= 5    
-        and obj.Size.Y <= 5    
-        and obj.Size.Z <= 5 then    
+-- evita partes falsas do mapa
+if obj.Size.X <= 5
+and obj.Size.Y <= 5
+and obj.Size.Z <= 5 then
 
-            local distance = (hrp.Position - obj.Position).Magnitude    
+local distance = (hrp.Position - obj.Position).Magnitude          
 
-            -- ignora moedas muito perto (já coletadas)    
-            if distance > 3 then    
+-- ignora moedas muito perto (já coletadas)          
+if distance > 3 then          
 
-                if distance < shortestDistance then    
-                    shortestDistance = distance    
-                    closestCoin = obj    
-                end    
-            end    
-        end    
-    end    
+    if distance < shortestDistance then          
+        shortestDistance = distance          
+        closestCoin = obj          
+    end          
+end
+
+end
+
+end
+
 end
 
 end
 
 return closestCoin
+
+end
+
+-- NOCLIP
+local NoclipEnabled = false
+
+RunService.Stepped:Connect(function()
+if NoclipEnabled and LocalPlayer.Character then
+for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
+if part:IsA("BasePart") then
+part.CanCollide = false
+end
+end
+end
+end)
+
+-- FLUTUAR ATÉ A COIN
+local function FlyToPosition(position, speed)
+
+local char = LocalPlayer.Character
+if not char or not char:FindFirstChild("HumanoidRootPart") then
+return
+end
+
+local hrp = char.HumanoidRootPart
+
+local distance = (hrp.Position - position).Magnitude
+local time = distance / speed
+
+local tween = TweenService:Create(
+hrp,
+TweenInfo.new(time, Enum.EasingStyle.Linear),
+{
+CFrame = CFrame.new(position + Vector3.new(0,2,0))
+}
+)
+
+NoclipEnabled = true
+
+tween:Play()
+tween.Completed:Wait()
+
+NoclipEnabled = false
 
 end
 
@@ -639,7 +686,7 @@ local CoinCooldown = false
 
 -- AUTO TP COIN
 TeleportTab:Toggle({
-Title = "Auto TP Coin",
+Title = "Auto collect Coin",
 Default = false,
 Callback = function(v)
 
@@ -649,12 +696,12 @@ if v then
 task.spawn(function()
 
 while AutoCoinEnabled do
-task.wait(1.5)
+task.wait(0.8)
 
 local coin = GetClosestCoin()
 
 if coin then
-TeleportToCFrame(coin.CFrame * CFrame.new(0,2,0))
+FlyToPosition(coin.Position, 60)
 end
 
 end
