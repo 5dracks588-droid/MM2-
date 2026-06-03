@@ -701,7 +701,7 @@ task.wait(0.8)
 local coin = GetClosestCoin()
 
 if coin then
-FlyToPosition(coin.Position, 60)
+FlyToPosition(coin.Position, 50)
 end
 
 end
