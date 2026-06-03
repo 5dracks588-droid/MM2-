@@ -696,12 +696,12 @@ if v then
 task.spawn(function()
 
 while AutoCoinEnabled do
-task.wait(0.8)
+task.wait(1)
 
 local coin = GetClosestCoin()
 
 if coin then
-FlyToPosition(coin.Position, 50)
+FlyToPosition(coin.Position, 45)
 end
 
 end
