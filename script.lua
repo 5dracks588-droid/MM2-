@@ -42,6 +42,7 @@ local AimbotEnabled = false
 local FovVisible = false
 local FovSize = 50
 local TargetType = "Murderer"
+local AutoCoinEnabled = false
 
 local EspEnabled = false
 local GunEspEnabled = false
@@ -152,6 +153,55 @@ return nil
 
 end
 
+-- COINS
+local function GetClosestCoin()
+local closestCoin = nil
+local shortestDistance = math.huge
+
+if not LocalPlayer.Character
+or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+return nil
+end
+
+local hrp = LocalPlayer.Character.HumanoidRootPart
+
+for _, obj in ipairs(workspace:GetDescendants()) do
+
+if obj:IsA("BasePart")    
+and obj.Parent    
+and obj.Transparency < 1 then    
+
+    local name = string.lower(obj.Name)    
+
+    if name:find("coin")    
+    or name:find("gold")    
+    or name:find("token") then    
+
+        -- evita partes falsas do mapa    
+        if obj.Size.X <= 5    
+        and obj.Size.Y <= 5    
+        and obj.Size.Z <= 5 then    
+
+            local distance = (hrp.Position - obj.Position).Magnitude    
+
+            -- ignora moedas muito perto (já coletadas)    
+            if distance > 3 then    
+
+                if distance < shortestDistance then    
+                    shortestDistance = distance    
+                    closestCoin = obj    
+                end    
+            end    
+        end    
+    end    
+end
+
+end
+
+return closestCoin
+
+end
+
 -- AIMBOT
 local function GetClosestPlayerToCenter()
 
@@ -174,37 +224,39 @@ and p.Character:FindFirstChild("Head")
 and p.Character:FindFirstChild("Humanoid")
 and p.Character.Humanoid.Health > 0 then
 
-local role = GetPlayerRole(p)      
+local role = GetPlayerRole(p)
 
-local canTarget = false      
+local canTarget = false
 
--- se você for murderer -> mira em TODOS      
-if myRole == "Murderer" then      
-    canTarget = true      
-else      
-    -- inocente/sheriff -> mira só no murderer      
-    if role == "Murderer" then      
-        canTarget = true      
-    end      
-end      
+-- se você for murderer -> mira em TODOS
+if myRole == "Murderer" then
+canTarget = true
+else
+-- inocente/sheriff -> mira só no murderer
+if role == "Murderer" then
+canTarget = true
+end
+end
 
-if canTarget then      
+if canTarget then
 
-    local pos,onScreen = Camera:WorldToViewportPoint(      
-        p.Character.Head.Position      
-    )      
+local pos,onScreen = Camera:WorldToViewportPoint(
+p.Character.Head.Position
+)
 
-    if onScreen then      
+if onScreen then
 
-        local distance = (      
-            Vector2.new(pos.X,pos.Y) - screenCenter      
-        ).Magnitude      
+local distance = (
+Vector2.new(pos.X,pos.Y) - screenCenter
+).Magnitude
 
-        if distance < shortestDistance then      
-            shortestDistance = distance      
-            closestPlayer = p.Character.Head      
-        end      
-    end      
+if distance < shortestDistance then
+shortestDistance = distance
+closestPlayer = p.Character.Head
+end
+
+end
+
 end
 
 end
@@ -243,30 +295,30 @@ highlight.OutlineColor = color
 highlight.FillTransparency = 0.5
 highlight.OutlineTransparency = 1
 
--- Billboard          
-local gui = char:FindFirstChild("ESPGui")          
-if not gui then          
-    gui = Instance.new("BillboardGui")          
-    gui.Name = "ESPGui"          
-    gui.Size = UDim2.new(0,200,0,60)          
-    gui.AlwaysOnTop = true          
-    gui.ExtentsOffset = Vector3.new(0,3,0)          
-    gui.Parent = char          
-end          
-gui.Adornee = char.Head          
+-- Billboard
+local gui = char:FindFirstChild("ESPGui")
+if not gui then
+gui = Instance.new("BillboardGui")
+gui.Name = "ESPGui"
+gui.Size = UDim2.new(0,200,0,60)
+gui.AlwaysOnTop = true
+gui.ExtentsOffset = Vector3.new(0,3,0)
+gui.Parent = char
+end
+gui.Adornee = char.Head
 
-local label = gui:FindFirstChild("TextLabel")          
-if not label then          
-    label = Instance.new("TextLabel")          
-    label.Size = UDim2.new(1,0,1,0)          
-    label.BackgroundTransparency = 1          
-    label.Font = Enum.Font.SourceSansBold          
-    label.TextSize = 14          
-    label.Parent = gui          
-end          
-label.TextColor3 = color          
+local label = gui:FindFirstChild("TextLabel")
+if not label then
+label = Instance.new("TextLabel")
+label.Size = UDim2.new(1,0,1,0)
+label.BackgroundTransparency = 1
+label.Font = Enum.Font.SourceSansBold
+label.TextSize = 14
+label.Parent = gui
+end
+label.TextColor3 = color
 
-local distance = math.floor((LocalPlayer.Character.HumanoidRootPart.Position - char.HumanoidRootPart.Position).Magnitude)          
+local distance = math.floor((LocalPlayer.Character.HumanoidRootPart.Position - char.HumanoidRootPart.Position).Magnitude)
 label.Text = p.Name .. "\n" .. role .. "\n" .. distance .. " m"
 
 else
@@ -580,6 +632,36 @@ if part then
 TeleportToCFrame(part.CFrame * CFrame.new(0,2,0))
 end
 end
+end
+})
+
+local CoinCooldown = false
+
+-- AUTO TP COIN
+TeleportTab:Toggle({
+Title = "Auto TP Coin",
+Default = false,
+Callback = function(v)
+
+AutoCoinEnabled = v
+
+if v then
+task.spawn(function()
+
+while AutoCoinEnabled do
+task.wait(1.5)
+
+local coin = GetClosestCoin()
+
+if coin then
+TeleportToCFrame(coin.CFrame * CFrame.new(0,2,0))
+end
+
+end
+
+end)
+end
+
 end
 })
 
