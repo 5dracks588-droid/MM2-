@@ -9,7 +9,7 @@ Author = "zxred",
 Folder = "MM2WindUI",
 Size = UDim2.fromOffset(580,430),
 Transparent = true,
-Theme = "Red",
+Theme = "Dark",
 SideBarWidth = 200,
 MinimizeKey = Enum.KeyCode.RightControl
 })
@@ -21,8 +21,8 @@ Icon = "zap",
 CornerRadius = UDim.new(0, 16),
 StrokeThickness = 2,
 Color = ColorSequence.new(
-Color3.fromHex("FF0000"), -- Vermelho Puro Hex
-Color3.fromHex("FF0000")  -- Vermelho Puro Hex
+Color3.fromHex("000000"), -- Preto
+Color3.fromHex("000000")  -- Preto
 ),
 OnlyMobile = false,
 Enabled = true,
@@ -41,9 +41,12 @@ local Camera = workspace.CurrentCamera
 -- Variáveis
 local AimbotEnabled = false
 local FovVisible = false
-local FovSize = 50
+local FovSize = 100
 local TargetType = "Murderer"
 local AutoCoinEnabled = false
+local SelectedTheme = "Dark"
+local AutoSafeEnabled = false
+local safeTpCount = 0
 
 local EspEnabled = false
 local GunEspEnabled = false
@@ -57,13 +60,18 @@ local SelectedPlayerToTp = ""
 
 -- FOV
 local FOVCircle = Drawing.new("Circle")
-FOVCircle.Color = Color3.fromRGB(255,0,0)
+FOVCircle.Color = Color3.fromRGB(0,0,0)
 FOVCircle.Thickness = 2
 FOVCircle.Transparency = 1
 FOVCircle.Filled = false
 FOVCircle.Visible = false
 
 -- Tabs
+local InfoTab = Window:Tab({
+Title = "Info",
+Icon = "house"
+})
+
 local CombatTab = Window:Tab({
 Title = "Combate",
 Icon = "sword"
@@ -79,6 +87,11 @@ Title = "Teleportes",
 Icon = "map-pinned"
 })
 
+local FarmTab = Window:Tab({
+Title = "Farm",
+Icon = "coins"
+})
+
 local PlayerTab = Window:Tab({
 Title = "Player",
 Icon = "user"
@@ -88,6 +101,56 @@ local PerformanceTab = Window:Tab({
 Title = "Desempenho",
 Icon = "cpu"
 })
+
+WindUI:SetTheme("Dark")
+
+-- SERVIÇOS
+local Stats = game:GetService("Stats")
+local HttpService = game:GetService("HttpService")
+
+-- VARIÁVEIS
+local CurrentTheme = "Dark"
+
+-- LABELS
+local PingParagraph = InfoTab:Paragraph({
+Title = "Ping",
+Desc = "0 ms"
+})
+
+local FPSParagraph = InfoTab:Paragraph({
+Title = "FPS",
+Desc = "0 FPS"
+})
+
+local ServerParagraph = InfoTab:Paragraph({
+Title = "Servidor",
+Desc = "0/0"
+})
+
+-- FPS
+local FPS = 0
+local Last = tick()
+
+RunService.RenderStepped:Connect(function()
+FPS += 1
+
+if tick() - Last >= 1 then
+
+local ping = math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue())
+
+PingParagraph:SetDesc(ping .. " ms")
+
+FPSParagraph:SetDesc(FPS .. " FPS")
+
+ServerParagraph:SetDesc(
+#Players:GetPlayers() .. "/" .. Players.MaxPlayers
+)
+
+FPS = 0
+Last = tick()
+
+end
+end)
 
 -- ROLE
 local function GetPlayerRole(player)
@@ -140,6 +203,32 @@ end
 return list
 end
 
+-- SAFE AREA
+local SafePart = Instance.new("Part")
+SafePart.Name = "SafeArea"
+SafePart.Size = Vector3.new(20,1,20)
+SafePart.Position = Vector3.new(10000,500,10000)
+
+SafePart.Anchored = true
+SafePart.CanCollide = true
+
+-- COR VERDE
+SafePart.Color = Color3.fromRGB(0,255,0)
+
+-- REMOVE TEXTURA QUADRICULADA
+SafePart.Material = Enum.Material.Neon
+
+-- TRANSPARÊNCIA
+SafePart.Transparency = 0
+
+SafePart.Parent = workspace
+
+local function TeleportToSafeArea()
+if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+LocalPlayer.Character.HumanoidRootPart.CFrame = SafePart.CFrame + Vector3.new(0,3,0)
+end
+end
+
 -- GUN
 local function FindDroppedGun()
 local gun = workspace:FindFirstChild("GunDrop")
@@ -183,15 +272,16 @@ if obj.Size.X <= 5
 and obj.Size.Y <= 5
 and obj.Size.Z <= 5 then
 
-local distance = (hrp.Position - obj.Position).Magnitude          
+local distance = (hrp.Position - obj.Position).Magnitude
 
--- ignora moedas muito perto (já coletadas)          
-if distance > 3 then          
+-- ignora moedas muito perto (já coletadas)
+if distance > 3 then
 
-    if distance < shortestDistance then          
-        shortestDistance = distance          
-        closestCoin = obj          
-    end          
+if distance < shortestDistance then
+shortestDistance = distance
+closestCoin = obj
+end
+
 end
 
 end
@@ -229,21 +319,32 @@ end
 
 local hrp = char.HumanoidRootPart
 
-local distance = (hrp.Position - position).Magnitude
-local time = distance / speed
+NoclipEnabled = true
+
+local target = position + Vector3.new(0,1,0)
+
+while AutoCoinEnabled and (hrp.Position - target).Magnitude > 0.5 do
+
+local direction = (target - hrp.Position).Unit
+local distance = math.min(speed, (hrp.Position - target).Magnitude)
+
+-- move em passos pequenos
+local nextPos = hrp.Position + (direction * distance)
 
 local tween = TweenService:Create(
 hrp,
-TweenInfo.new(time, Enum.EasingStyle.Linear),
+TweenInfo.new(0.15, Enum.EasingStyle.Linear),
 {
-CFrame = CFrame.new(position + Vector3.new(0,2,0))
+CFrame = CFrame.new(nextPos)
 }
 )
 
-NoclipEnabled = true
-
 tween:Play()
 tween.Completed:Wait()
+
+task.wait(0.03)
+
+end
 
 NoclipEnabled = false
 
@@ -520,7 +621,7 @@ Callback = function(v) FovVisible = v end
 CombatTab:Slider({
 Title = "FOV",
 Step = 1,
-Value = { Min = 30, Max = 500, Default = 50 },
+Value = { Min = 50, Max = 500, Default = 100 },
 Callback = function(v) FovSize = v end
 })
 
@@ -595,6 +696,13 @@ TeleportTab:Button({
 Title = "Atualizar Lista",
 Callback = function()
 PlayerDropdown:Refresh(GetPlayerNamesList())
+end
+})
+
+TeleportTab:Button({
+Title = "TP Área Segura",
+Callback = function()
+TeleportToSafeArea()
 end
 })
 
@@ -685,7 +793,7 @@ end
 local CoinCooldown = false
 
 -- AUTO TP COIN
-TeleportTab:Toggle({
+FarmTab:Toggle({
 Title = "Auto collect Coin",
 Default = false,
 Callback = function(v)
@@ -701,7 +809,7 @@ task.wait(1)
 local coin = GetClosestCoin()
 
 if coin then
-FlyToPosition(coin.Position, 35)
+FlyToPosition(coin.Position, 10)
 end
 
 end
@@ -711,6 +819,34 @@ end
 
 end
 })
+
+FarmTab:Toggle({
+Title = "Auto TP Área Segura",
+Default = false,
+Callback = function(v)
+AutoSafeEnabled = v
+
+if v then
+task.spawn(function()
+while AutoSafeEnabled do
+task.wait(0.00)
+
+local char = LocalPlayer.Character
+if not char then continue end
+
+if GetPlayerRole(LocalPlayer) == "Innocent" then
+TeleportToSafeArea()
+end
+
+end
+end)
+end
+end
+})
+
+LocalPlayer.CharacterAdded:Connect(function()
+safeTpCount = 0
+end)
 
 -- ====================================================================
 
