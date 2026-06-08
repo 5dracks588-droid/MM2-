@@ -912,29 +912,35 @@ end)
 
 -- PLAYER
 PlayerTab:Input({
-Title = "Velocidade",
-Placeholder = "Digite um número",
-Callback = function(text)
-local num = tonumber(text)
-if num then Speed = num end
-end
+    Title = "Velocidade",
+    Placeholder = "Digite um número",
+    Callback = function(text)
+        local num = tonumber(text)
+        if num then
+            Speed = num
+        end
+    end
 })
 
 PlayerTab:Input({
-Title = "Pulo",
-Placeholder = "Digite um número",
-Callback = function(text)
-local num = tonumber(text)
-if num then Jump = num end
-end
+    Title = "Pulo",
+    Placeholder = "Digite um número",
+    Callback = function(text)
+        local num = tonumber(text)
+        if num then
+            Jump = num
+        end
+    end
 })
 
 -- PERFORMANCE
 PerformanceTab:Toggle({
-Title = "Modo Leve",
-Default = false,
-Callback = function(v)
-LowGraphicsEnabled = v
-if v then OptimizeTextures() end
-end
+    Title = "Modo Leve",
+    Default = false,
+    Callback = function(v)
+        LowGraphicsEnabled = v
+        if v then
+            OptimizeTextures()
+        end
+    end
 })
