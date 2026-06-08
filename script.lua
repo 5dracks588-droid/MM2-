@@ -1,3 +1,5 @@
+Assim é o correto né?
+
 -- WindUI
 local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
 
@@ -47,6 +49,8 @@ local AutoCoinEnabled = false
 local SelectedTheme = "Dark"
 local AutoSafeEnabled = false
 local safeTpCount = 0
+local KnifeAuraEnabled = false
+local KnifeAuraDistance = 5
 
 local EspEnabled = false
 local GunEspEnabled = false
@@ -603,6 +607,43 @@ end
 end
 end
 
+-- KNIFE AURA
+if KnifeAuraEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+local myHRP = LocalPlayer.Character.HumanoidRootPart
+
+for _,plr in pairs(Players:GetPlayers()) do    
+    if plr ~= LocalPlayer    
+    and plr.Character    
+    and plr.Character:FindFirstChild("HumanoidRootPart")    
+    and plr.Character:FindFirstChild("Humanoid")    
+    and plr.Character.Humanoid.Health > 0 then    
+
+        -- só jogadores da partida    
+        local role = GetPlayerRole(plr)    
+
+        if role == "Murderer" or role == "Sheriff" or role == "Innocent" then    
+
+            local targetHRP = plr.Character.HumanoidRootPart    
+
+            -- ignora lobby/safe area    
+            local distanceFromSafe = (targetHRP.Position - SafePart.Position).Magnitude    
+
+            if distanceFromSafe > 50 then    
+
+                local frontPos = myHRP.Position + (myHRP.CFrame.LookVector * KnifeAuraDistance)    
+
+                targetHRP.CFrame = CFrame.new(frontPos)    
+
+                targetHRP.AssemblyLinearVelocity = Vector3.new(0,0,0)    
+                targetHRP.AssemblyAngularVelocity = Vector3.new(0,0,0)    
+
+            end    
+        end    
+    end    
+end
+
+end
+
 end)
 
 -- COMBATE
@@ -629,6 +670,27 @@ CombatTab:Toggle({
 Title = "Anti Fling",
 Default = false,
 Callback = function(v) AntiFlingEnabled = v end
+})
+
+CombatTab:Toggle({
+Title = "Knife Aura",
+Default = false,
+Callback = function(v)
+KnifeAuraEnabled = v
+end
+})
+
+CombatTab:Slider({
+Title = "Distância Aura",
+Step = 1,
+Value = {
+Min = 3,
+Max = 10,
+Default = 5
+},
+Callback = function(v)
+KnifeAuraDistance = v
+end
 })
 
 -- ESP
