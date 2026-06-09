@@ -58,6 +58,17 @@ local LowGraphicsEnabled = false
 local Speed = 16
 local Jump = 50
 
+local InfiniteJump = false
+local NoclipEnabled = false
+
+local FlyEnabled = false
+local FlySpeed = 70
+
+local bodyVelocity
+local bodyGyro
+local flyConnection
+local moveVector = Vector3.zero
+
 local SelectedPlayerToTp = ""
 
 -- FOV
@@ -109,6 +120,7 @@ WindUI:SetTheme("Dark")
 -- SERVIÇOS
 local Stats = game:GetService("Stats")
 local HttpService = game:GetService("HttpService")
+local UserInputService = game:GetService("UserInputService")
 
 -- VARIÁVEIS
 local CurrentTheme = "Dark"
@@ -516,6 +528,114 @@ end
 end
 end)
 
+local function StartFly()
+if FlyEnabled then return end
+FlyEnabled = true
+
+local char = LocalPlayer.Character  
+if not char then return end  
+
+local hrp = char:WaitForChild("HumanoidRootPart")  
+local hum = char:WaitForChild("Humanoid")  
+
+hum.PlatformStand = true  
+
+bodyVelocity = Instance.new("BodyVelocity")  
+bodyVelocity.MaxForce = Vector3.new(math.huge,math.huge,math.huge)  
+bodyVelocity.Velocity = Vector3.zero  
+bodyVelocity.Parent = hrp  
+
+bodyGyro = Instance.new("BodyGyro")  
+bodyGyro.MaxTorque = Vector3.new(math.huge,math.huge,math.huge)  
+bodyGyro.P = 100000  
+bodyGyro.CFrame = Camera.CFrame  
+bodyGyro.Parent = hrp  
+
+flyConnection = RunService.RenderStepped:Connect(function()  
+
+    local camCF = Camera.CFrame  
+    local direction = Vector3.zero  
+
+    direction += camCF.LookVector * moveVector.Z  
+    direction += camCF.RightVector * moveVector.X  
+
+    if direction.Magnitude > 0 then  
+        bodyVelocity.Velocity = direction.Unit * FlySpeed  
+    else  
+        bodyVelocity.Velocity = Vector3.zero  
+    end  
+
+    bodyGyro.CFrame = camCF  
+end)
+
+end
+
+local function StopFly()
+FlyEnabled = false
+
+local char = LocalPlayer.Character  
+if char and char:FindFirstChild("Humanoid") then  
+    char.Humanoid.PlatformStand = false  
+end  
+
+if flyConnection then  
+    flyConnection:Disconnect()  
+    flyConnection = nil  
+end  
+
+if bodyVelocity then  
+    bodyVelocity:Destroy()  
+    bodyVelocity = nil  
+end  
+
+if bodyGyro then  
+    bodyGyro:Destroy()  
+    bodyGyro = nil  
+end
+
+end
+
+UserInputService.InputBegan:Connect(function(input,gp)
+if gp then return end
+
+if input.KeyCode == Enum.KeyCode.W then  
+    moveVector = Vector3.new(0,0,-1)  
+
+elseif input.KeyCode == Enum.KeyCode.S then  
+    moveVector = Vector3.new(0,0,1)  
+
+elseif input.KeyCode == Enum.KeyCode.A then  
+    moveVector = Vector3.new(-1,0,0)  
+
+elseif input.KeyCode == Enum.KeyCode.D then  
+    moveVector = Vector3.new(1,0,0)  
+end
+
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+
+if input.KeyCode == Enum.KeyCode.W  
+or input.KeyCode == Enum.KeyCode.S  
+or input.KeyCode == Enum.KeyCode.A  
+or input.KeyCode == Enum.KeyCode.D then  
+
+    moveVector = Vector3.zero  
+end
+
+end)
+
+UserInputService.JumpRequest:Connect(function()
+if InfiniteJump and LocalPlayer.Character then
+local hum = LocalPlayer.Character:FindFirstChild("Humanoid")
+
+if hum then  
+        hum:ChangeState(Enum.HumanoidStateType.Jumping)  
+    end  
+end
+
+end)
+
 -- LOOP
 RunService.RenderStepped:Connect(function()
 -- FOV
@@ -609,35 +729,37 @@ end
 if KnifeAuraEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
 local myHRP = LocalPlayer.Character.HumanoidRootPart
 
-for _,plr in pairs(Players:GetPlayers()) do    
-    if plr ~= LocalPlayer    
-    and plr.Character    
-    and plr.Character:FindFirstChild("HumanoidRootPart")    
-    and plr.Character:FindFirstChild("Humanoid")    
-    and plr.Character.Humanoid.Health > 0 then    
+for _,plr in pairs(Players:GetPlayers()) do
+if plr ~= LocalPlayer
+and plr.Character
+and plr.Character:FindFirstChild("HumanoidRootPart")
+and plr.Character:FindFirstChild("Humanoid")
+and plr.Character.Humanoid.Health > 0 then
 
-        -- só jogadores da partida    
-        local role = GetPlayerRole(plr)    
+-- só jogadores da partida
+local role = GetPlayerRole(plr)
 
-        if role == "Murderer" or role == "Sheriff" or role == "Innocent" then    
+if role == "Murderer" or role == "Sheriff" or role == "Innocent" then        
 
-            local targetHRP = plr.Character.HumanoidRootPart    
+    local targetHRP = plr.Character.HumanoidRootPart        
 
-            -- ignora lobby/safe area    
-            local distanceFromSafe = (targetHRP.Position - SafePart.Position).Magnitude    
+    -- ignora lobby/safe area        
+    local distanceFromSafe = (targetHRP.Position - SafePart.Position).Magnitude        
 
-            if distanceFromSafe > 50 then    
+    if distanceFromSafe > 50 then        
 
-                local frontPos = myHRP.Position + (myHRP.CFrame.LookVector * KnifeAuraDistance)    
+        local frontPos = myHRP.Position + (myHRP.CFrame.LookVector * KnifeAuraDistance)        
 
-                targetHRP.CFrame = CFrame.new(frontPos)    
+        targetHRP.CFrame = CFrame.new(frontPos)        
 
-                targetHRP.AssemblyLinearVelocity = Vector3.new(0,0,0)    
-                targetHRP.AssemblyAngularVelocity = Vector3.new(0,0,0)    
+        targetHRP.AssemblyLinearVelocity = Vector3.new(0,0,0)        
+        targetHRP.AssemblyAngularVelocity = Vector3.new(0,0,0)        
 
-            end    
-        end    
-    end    
+    end        
+end
+
+end
+
 end
 
 end
@@ -912,35 +1034,82 @@ end)
 
 -- PLAYER
 PlayerTab:Input({
-    Title = "Velocidade",
-    Placeholder = "Digite um número",
-    Callback = function(text)
-        local num = tonumber(text)
-        if num then
-            Speed = num
-        end
-    end
+Title = "Velocidade",
+Placeholder = "16",
+Callback = function(text)
+local num = tonumber(text)
+
+if num then  
+        Speed = num  
+    end  
+end
+
 })
 
 PlayerTab:Input({
-    Title = "Pulo",
-    Placeholder = "Digite um número",
-    Callback = function(text)
-        local num = tonumber(text)
-        if num then
-            Jump = num
-        end
-    end
+Title = "Pulo",
+Placeholder = "50",
+Callback = function(text)
+local num = tonumber(text)
+
+if num then  
+        Jump = num  
+    end  
+end
+
 })
+
+PlayerTab:Toggle({
+Title = "Pulo Infinito",
+Default = false,
+Callback = function(v)
+InfiniteJump = v
+end
+})
+
+PlayerTab:Toggle({
+Title = "NoClip",
+Default = false,
+Callback = function(v)
+NoclipEnabled = v
+end
+})
+
+PlayerTab:Toggle({
+Title = "Fly",
+Default = false,
+Callback = function(v)
+
+if v then  
+        StartFly()  
+    else  
+        StopFly()  
+    end  
+end
+
+})
+
+PlayerTab:Slider({
+Title = "Fly Speed",
+Step = 5,
+Value = {
+Min = 10,
+Max = 200,
+Default = 70
+},
+Callback = function(v)
+FlySpeed = v
+end
 
 -- PERFORMANCE
 PerformanceTab:Toggle({
-    Title = "Modo Leve",
-    Default = false,
-    Callback = function(v)
-        LowGraphicsEnabled = v
-        if v then
-            OptimizeTextures()
-        end
-    end
+Title = "Modo Leve",
+Default = false,
+Callback = function(v)
+LowGraphicsEnabled = v
+if v then
+OptimizeTextures()
+end
+end
+})
 })
