@@ -49,7 +49,9 @@ local AutoSafeEnabled = false
 local safeTpCount = 0
 local KnifeAuraEnabled = false
 local KnifeAuraDistance = 5
+local SavedPositions = {}
 
+local EspEnabled = false
 local EspEnabled = false
 local GunEspEnabled = false
 local AntiFlingEnabled = false
@@ -771,8 +773,7 @@ end
 end
 
 -- KNIFE AURA
-local SavedPositions = {}
-
+        
 if KnifeAuraEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
     local myHRP = LocalPlayer.Character.HumanoidRootPart
 
@@ -824,8 +825,10 @@ else
         end
     end
 
-    SavedPositions = {}
-        end
+SavedPositions = {}
+end
+
+end)
 
 -- COMBATE
 CombatTab:Toggle({
