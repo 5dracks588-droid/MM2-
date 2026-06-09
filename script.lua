@@ -668,6 +668,19 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
+-- PULO INFINITO
+UserInputService.JumpRequest:Connect(function()
+
+    if InfiniteJump then
+
+        local hum = Character and Character:FindFirstChild("Humanoid")
+
+        if hum then
+            hum:ChangeState(Enum.HumanoidStateType.Jumping)
+        end
+    end
+end)
+
 -- LOOP
 RunService.RenderStepped:Connect(function()
 -- FOV
