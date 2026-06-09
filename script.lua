@@ -771,45 +771,61 @@ end
 end
 
 -- KNIFE AURA
+local SavedPositions = {}
+
 if KnifeAuraEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-local myHRP = LocalPlayer.Character.HumanoidRootPart
+    local myHRP = LocalPlayer.Character.HumanoidRootPart
 
-for _,plr in pairs(Players:GetPlayers()) do
-if plr ~= LocalPlayer
-and plr.Character
-and plr.Character:FindFirstChild("HumanoidRootPart")
-and plr.Character:FindFirstChild("Humanoid")
-and plr.Character.Humanoid.Health > 0 then
+    for _,plr in pairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer
+        and plr.Character
+        and plr.Character:FindFirstChild("HumanoidRootPart")
+        and plr.Character:FindFirstChild("Humanoid")
+        and plr.Character.Humanoid.Health > 0 then
 
--- só jogadores da partida
-local role = GetPlayerRole(plr)
+            local role = GetPlayerRole(plr)
 
-if role == "Murderer" or role == "Sheriff" or role == "Innocent" then        
+            if role == "Murderer" or role == "Sheriff" or role == "Innocent" then
 
-    local targetHRP = plr.Character.HumanoidRootPart        
+                local targetHRP = plr.Character.HumanoidRootPart
 
-    -- ignora lobby/safe area        
-    local distanceFromSafe = (targetHRP.Position - SafePart.Position).Magnitude        
+                local distanceFromSafe = (targetHRP.Position - SafePart.Position).Magnitude
 
-    if distanceFromSafe > 50 then        
+                if distanceFromSafe > 50 then
 
-        local frontPos = myHRP.Position + (myHRP.CFrame.LookVector * KnifeAuraDistance)        
+                    -- salva posição original
+                    if not SavedPositions[plr] then
+                        SavedPositions[plr] = targetHRP.CFrame
+                    end
 
-        targetHRP.CFrame = CFrame.new(frontPos)        
+                    local frontPos = myHRP.Position + (myHRP.CFrame.LookVector * KnifeAuraDistance)
 
-        targetHRP.AssemblyLinearVelocity = Vector3.new(0,0,0)        
-        targetHRP.AssemblyAngularVelocity = Vector3.new(0,0,0)        
+                    targetHRP.CFrame = CFrame.new(frontPos)
 
-    end        
-end
+                    targetHRP.AssemblyLinearVelocity = Vector3.new(0,0,0)
+                    targetHRP.AssemblyAngularVelocity = Vector3.new(0,0,0)
 
-end
+                end
+            end
+        end
+    end
 
-end
+else
+    -- restaura posição quando desativar
+    for plr, savedCFrame in pairs(SavedPositions) do
+        if plr
+        and plr.Character
+        and plr.Character:FindFirstChild("HumanoidRootPart") then
 
-end
+            plr.Character.HumanoidRootPart.CFrame = savedCFrame
 
-end)
+            plr.Character.HumanoidRootPart.AssemblyLinearVelocity = Vector3.zero
+            plr.Character.HumanoidRootPart.AssemblyAngularVelocity = Vector3.zero
+        end
+    end
+
+    SavedPositions = {}
+        end
 
 -- COMBATE
 CombatTab:Toggle({
