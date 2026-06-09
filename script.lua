@@ -1100,6 +1100,7 @@ Default = 70
 Callback = function(v)
 FlySpeed = v
 end
+})
 
 -- PERFORMANCE
 PerformanceTab:Toggle({
@@ -1111,5 +1112,4 @@ if v then
 OptimizeTextures()
 end
 end
-})
 })
