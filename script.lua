@@ -357,7 +357,7 @@ CFrame = CFrame.new(nextPos)
 tween:Play()
 tween.Completed:Wait()
 
-task.wait(0.03)
+task.wait(0.00)
 
 end
 
