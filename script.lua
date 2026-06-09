@@ -1049,7 +1049,7 @@ if v then
 task.spawn(function()
 
 while AutoCoinEnabled do
-task.wait(0)
+task.wait(1)
 
 local coin = GetClosestCoin()
 
