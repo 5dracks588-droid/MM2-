@@ -333,21 +333,32 @@ end
 
 local hrp = char.HumanoidRootPart
 
-local distance = (hrp.Position - position).Magnitude
-local time = distance / speed
+NoclipEnabled = true
+
+local target = position + Vector3.new(0,1,0)
+
+while AutoCoinEnabled and (hrp.Position - target).Magnitude > 0.5 do
+
+local direction = (target - hrp.Position).Unit
+local distance = math.min(speed, (hrp.Position - target).Magnitude)
+
+-- move em passos pequenos
+local nextPos = hrp.Position + (direction * distance)
 
 local tween = TweenService:Create(
 hrp,
-TweenInfo.new(time, Enum.EasingStyle.Linear),
+TweenInfo.new(0.15, Enum.EasingStyle.Linear),
 {
-CFrame = CFrame.new(position + Vector3.new(0,2,0))
+CFrame = CFrame.new(nextPos)
 }
 )
 
-NoclipEnabled = true
-
 tween:Play()
 tween.Completed:Wait()
+
+task.wait(0.03)
+
+end
 
 NoclipEnabled = false
 
