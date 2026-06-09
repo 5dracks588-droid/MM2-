@@ -52,7 +52,6 @@ local KnifeAuraDistance = 5
 local SavedPositions = {}
 
 local EspEnabled = false
-local EspEnabled = false
 local GunEspEnabled = false
 local AntiFlingEnabled = false
 local LowGraphicsEnabled = false
