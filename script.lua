@@ -324,41 +324,33 @@ end
 end)
 
 -- FLUTUAR ATÉ A COIN
--- FLUTUAR ATÉ A COIN
 local function FlyToPosition(position, speed)
 
-    local char = LocalPlayer.Character
-    if not char then return end
+local char = LocalPlayer.Character
+if not char or not char:FindFirstChild("HumanoidRootPart") then
+return
+end
 
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    local hum = char:FindFirstChild("Humanoid")
+local hrp = char.HumanoidRootPart
 
-    if not hrp or not hum then
-        return
-    end
+local distance = (hrp.Position - position).Magnitude
+local time = distance / speed
 
-    NoclipEnabled = true
+local tween = TweenService:Create(
+hrp,
+TweenInfo.new(time, Enum.EasingStyle.Linear),
+{
+CFrame = CFrame.new(position + Vector3.new(0,2,0))
+}
+)
 
-    -- evita cair
-    hum.PlatformStand = true
+NoclipEnabled = true
 
-    local target = position + Vector3.new(0,2,0)
+tween:Play()
+tween.Completed:Wait()
 
-    while AutoCoinEnabled
-    and char
-    and hrp
-    and (hrp.Position - target).Magnitude > 2 do
+NoclipEnabled = false
 
-        hrp.CFrame = hrp.CFrame:Lerp(
-            CFrame.new(target),
-            0.35
-        )
-
-        task.wait(0.01)
-    end
-
-    hum.PlatformStand = false
-    NoclipEnabled = false
 end
 
 -- AIMBOT
