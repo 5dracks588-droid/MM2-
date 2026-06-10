@@ -125,6 +125,8 @@ local UserInputService = game:GetService("UserInputService")
 
 -- VARIÁVEIS
 local CurrentTheme = "Dark"
+local AutoCoinEnabled = false
+local AutoCoinSpeed = 5
 
 -- LABELS
 local PingParagraph = InfoTab:Paragraph({
@@ -325,7 +327,7 @@ end
 end)
 
 -- FLUTUAR ATÉ A COIN
-local function FlyToPosition(position, speed)
+local function FlyToPosition(coin.Position, AutoCoinSpeed)
 
 local char = LocalPlayer.Character
 if not char or not char:FindFirstChild("HumanoidRootPart") then
@@ -1062,6 +1064,19 @@ end
 end)
 end
 
+end
+})
+
+FarmTab:Slider({
+Title = "Velocidade Auto Coin",
+Step = 1,
+Value = {
+Min = 1,
+Max = 20,
+Default = 5
+},
+Callback = function(v)
+AutoCoinSpeed = v
 end
 })
 
