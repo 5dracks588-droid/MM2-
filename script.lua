@@ -322,41 +322,41 @@ end
 end)
 
 -- FLUTUAR ATÉ A COIN
-local function FlyToPosition(position, speed)
+local offset = Vector3.new(0, 3, 0)
+position = position + offset
 
-    local offset = Vector3.new(0, 3, 0)
-    position = position + offset
+local char = LocalPlayer.Character  
+if not char then return end  
 
-    local char = LocalPlayer.Character  
-    if not char then return end  
+local hrp = char:FindFirstChild("HumanoidRootPart")  
+if not hrp then return end  
 
-    local hrp = char:FindFirstChild("HumanoidRootPart")  
-    if not hrp then return end  
+NoclipEnabled = true  
 
-    NoclipEnabled = true  
+local bv = Instance.new("BodyVelocity")  
+bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)  
+bv.Velocity = Vector3.zero  
+bv.Parent = hrp  
 
-    local bv = Instance.new("BodyVelocity")  
-    bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)  
-    bv.Velocity = Vector3.zero  
-    bv.Parent = hrp  
+while AutoCoinEnabled do  
 
-    while AutoCoinEnabled do  
+    local distance = (hrp.Position - position).Magnitude  
 
-        local distance = (hrp.Position - position).Magnitude  
-
-        if distance <= 0 then  
-            break  
-        end  
-
-        local direction = (position - hrp.Position).Unit  
-
-        bv.Velocity = direction * math.clamp(distance * 5, 5, speed)  
-
-        task.wait(0.03)  
+    if distance <= 0 then  
+        break  
     end  
 
-    bv:Destroy()  
-    NoclipEnabled = false  
+    local direction = (position - hrp.Position).Unit  
+
+    bv.Velocity = direction * math.clamp(distance * 5, 5, speed)  
+
+    task.wait(0.03)  
+end  
+
+bv:Destroy()  
+
+NoclipEnabled = false
+
 end
 
 -- AIMBOT
