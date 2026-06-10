@@ -330,6 +330,8 @@ local function FlyToPosition(target, speed)
     local hrp = char:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
 
+    if not target then return end
+
     NoclipEnabled = true
 
     local bv = Instance.new("BodyVelocity")
@@ -339,17 +341,18 @@ local function FlyToPosition(target, speed)
 
     while AutoCoinEnabled do
 
-        -- verifica se a moeda ainda existe
+        -- verifica se a coin ainda existe
         if not target
         or not target.Parent
         or target.Transparency >= 1 then
             break
         end
 
-        local position = target.Position
+        local position = target.Position + Vector3.new(0, 2, 0)
+
         local distance = (hrp.Position - position).Magnitude
 
-        -- chegou na moeda
+        -- chegou na coin
         if distance <= 2 then
             break
         end
@@ -362,6 +365,7 @@ local function FlyToPosition(target, speed)
     end
 
     bv:Destroy()
+
     NoclipEnabled = false
 end
 
@@ -1054,7 +1058,7 @@ task.wait(0.5)
 local coin = GetClosestCoin()
 
 if coin then
-FlyToPosition(coin.Position, AutoCoinSpeed)
+FlyToPosition(coin, AutoCoinSpeed)
 end
 
 end
