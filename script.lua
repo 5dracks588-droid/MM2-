@@ -276,7 +276,8 @@ local function GetClosestCoin()
 
         if obj:IsA("BasePart")
         and obj.Parent
-        and obj.Transparency < 1 then
+        and obj.Transparency < 1
+        and obj.CanCollide == false then
 
             local name = string.lower(obj.Name)
 
@@ -284,30 +285,18 @@ local function GetClosestCoin()
             or name:find("gold")
             or name:find("token") then
 
-                if obj.Size.X <= 5
-                and obj.Size.Y <= 5
-                and obj.Size.Z <= 5 then
+                -- evita peças grandes do mapa
+                if obj.Size.X <= 6 and obj.Size.Y <= 6 and obj.Size.Z <= 6 then
 
-                    -- VERIFICA CHÃO EMBAIXO
-                    local rayOrigin = obj.Position
-                    local rayDirection = Vector3.new(0, -15, 0)
-
-                    local rayParams = RaycastParams.new()
-                    rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
-                    rayParams.FilterType = Enum.RaycastFilterType.Blacklist
-
-                    local result = workspace:Raycast(rayOrigin, rayDirection, rayParams)
-
-                    -- só aceita moeda com chão
-                    if result then
+                    -- evita coisas no lobby/spawn
+                    local model = obj:FindFirstAncestorOfClass("Model")
+                    if model and not model:FindFirstChild("Lobby") then
 
                         local distance = (hrp.Position - obj.Position).Magnitude
 
-                        if distance > 3 then
-                            if distance < shortestDistance then
-                                shortestDistance = distance
-                                closestCoin = obj
-                            end
+                        if distance > 3 and distance < shortestDistance then
+                            shortestDistance = distance
+                            closestCoin = obj
                         end
 
                     end
