@@ -124,9 +124,9 @@ local HttpService = game:GetService("HttpService")
 local UserInputService = game:GetService("UserInputService")
 
 -- VARIÁVEIS
-local CurrentTheme = "Dark"
 local AutoCoinEnabled = false
 local AutoCoinSpeed = 5
+local CurrentTheme = "Dark"
 
 -- LABELS
 local PingParagraph = InfoTab:Paragraph({
