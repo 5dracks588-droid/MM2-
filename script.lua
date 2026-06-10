@@ -262,55 +262,61 @@ end
 
 -- COINS
 local function GetClosestCoin()
-local closestCoin = nil
-local shortestDistance = math.huge
+    local closestCoin = nil
+    local shortestDistance = math.huge
 
-if not LocalPlayer.Character
-or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-return nil
-end
+    if not LocalPlayer.Character
+    or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        return nil
+    end
 
-local hrp = LocalPlayer.Character.HumanoidRootPart
+    local hrp = LocalPlayer.Character.HumanoidRootPart
 
-for _, obj in ipairs(workspace:GetDescendants()) do
+    for _, obj in ipairs(workspace:GetDescendants()) do
 
-if obj:IsA("BasePart")
-and obj.Parent
-and obj.Transparency < 1 then
+        if obj:IsA("BasePart")
+        and obj.Parent
+        and obj.Transparency < 1 then
 
-local name = string.lower(obj.Name)
+            local name = string.lower(obj.Name)
 
-if name:find("coin")
-or name:find("gold")
-or name:find("token") then
+            if name:find("coin")
+            or name:find("gold")
+            or name:find("token") then
 
--- evita partes falsas do mapa
-if obj.Size.X <= 5
-and obj.Size.Y <= 5
-and obj.Size.Z <= 5 then
+                if obj.Size.X <= 5
+                and obj.Size.Y <= 5
+                and obj.Size.Z <= 5 then
 
-local distance = (hrp.Position - obj.Position).Magnitude
+                    -- VERIFICA CHÃO EMBAIXO
+                    local rayOrigin = obj.Position
+                    local rayDirection = Vector3.new(0, -15, 0)
 
--- ignora moedas muito perto (já coletadas)
-if distance > 3 then
+                    local rayParams = RaycastParams.new()
+                    rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
+                    rayParams.FilterType = Enum.RaycastFilterType.Blacklist
 
-if distance < shortestDistance then
-shortestDistance = distance
-closestCoin = obj
-end
+                    local result = workspace:Raycast(rayOrigin, rayDirection, rayParams)
 
-end
+                    -- só aceita moeda com chão
+                    if result then
 
-end
+                        local distance = (hrp.Position - obj.Position).Magnitude
 
-end
+                        if distance > 3 then
+                            if distance < shortestDistance then
+                                shortestDistance = distance
+                                closestCoin = obj
+                            end
+                        end
 
-end
+                    end
+                end
+            end
+        end
+    end
 
-end
-
-return closestCoin
-
+    return closestCoin
 end
 
 -- NOCLIP
