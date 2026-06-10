@@ -327,7 +327,7 @@ end
 end)
 
 -- FLUTUAR ATÉ A COIN
-local function FlyToPosition(coin.Position, AutoCoinSpeed)
+local function FlyToPosition(position, speed)
 
 local char = LocalPlayer.Character
 if not char or not char:FindFirstChild("HumanoidRootPart") then
@@ -1056,7 +1056,7 @@ task.wait(0)
 local coin = GetClosestCoin()
 
 if coin then
-FlyToPosition(coin.Position, 5)
+FlyToPosition(coin.Position, AutoCoinSpeed)
 end
 
 end
