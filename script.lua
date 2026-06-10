@@ -324,42 +324,36 @@ end)
 -- FLUTUAR ATÉ A COIN
 local function FlyToPosition(position, speed)
 
-local char = LocalPlayer.Character
-if not char or not char:FindFirstChild("HumanoidRootPart") then
-return
-end
+    local char = LocalPlayer.Character  
+    if not char then return end  
 
-local hrp = char.HumanoidRootPart
+    local hrp = char:FindFirstChild("HumanoidRootPart")  
+    if not hrp then return end  
 
-NoclipEnabled = true
+    NoclipEnabled = true  
 
-local target = position + Vector3.new(0,1,0)
+    local bv = Instance.new("BodyVelocity")  
+    bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)  
+    bv.Velocity = Vector3.zero  
+    bv.Parent = hrp  
 
-while AutoCoinEnabled and (hrp.Position - target).Magnitude > 0.5 do
+    while AutoCoinEnabled do  
 
-local direction = (target - hrp.Position).Unit
-local distance = math.min(speed, (hrp.Position - target).Magnitude)
+        local distance = (hrp.Position - position).Magnitude  
 
--- move em passos pequenos
-local nextPos = hrp.Position + (direction * distance)
+        if distance <= 0 then  
+            break  
+        end  
 
-local tween = TweenService:Create(
-hrp,
-TweenInfo.new(0.15, Enum.EasingStyle.Linear),
-{
-CFrame = CFrame.new(nextPos)
-}
-)
+        local direction = (position - hrp.Position).Unit  
 
-tween:Play()
-tween.Completed:Wait()
+        bv.Velocity = direction * math.clamp(distance * 5, 5, speed)  
 
-task.wait(0.03)
+        task.wait(0.03)  
+    end  
 
-end
-
-NoclipEnabled = false
-
+    bv:Destroy()  
+    NoclipEnabled = false  
 end
 
 -- AIMBOT
