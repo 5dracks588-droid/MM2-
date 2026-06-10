@@ -294,7 +294,7 @@ local function GetClosestCoin()
 
                         local distance = (hrp.Position - obj.Position).Magnitude
 
-                        if distance > 3 and distance < shortestDistance then
+                        if distance > 0 and distance < shortestDistance then
                             shortestDistance = distance
                             closestCoin = obj
                         end
@@ -341,7 +341,7 @@ local function FlyToPosition(position, speed)
 
         local distance = (hrp.Position - position).Magnitude
 
-        if distance <= 1 then
+        if distance <= 3 then
             break
         end
 
