@@ -359,7 +359,7 @@ local function FlyToPosition(target, speed)
 
         local direction = (position - hrp.Position).Unit
 
-        bv.Velocity = direction * math.clamp(distance * 20, 20, speed)
+        bv.Velocity = direction * math.clamp(distance * 10, 10, speed)
 
         task.wait(0.03)
     end
