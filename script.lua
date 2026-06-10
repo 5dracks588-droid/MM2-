@@ -352,13 +352,13 @@ local function FlyToPosition(position, speed)
 
         local distance = (hrp.Position - position).Magnitude
 
-        if distance <= 3 then
+        if distance <= 0.05 then
             break
         end
 
         local direction = (position - hrp.Position).Unit
 
-        bv.Velocity = direction * speed
+        bv.Velocity = direction * math.clamp(distance * 2, 5, speed)
 
         task.wait(0.03)
     end
