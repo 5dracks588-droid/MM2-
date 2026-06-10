@@ -322,38 +322,47 @@ end
 end)
 
 -- FLUTUAR ATÉ A COIN
-local function FlyToPosition(position, speed)
+local function FlyToPosition(target, speed)
 
-    local char = LocalPlayer.Character  
-    if not char then return end  
+    local char = LocalPlayer.Character
+    if not char then return end
 
-    local hrp = char:FindFirstChild("HumanoidRootPart")  
-    if not hrp then return end  
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
 
-    NoclipEnabled = true  
+    NoclipEnabled = true
 
-    local bv = Instance.new("BodyVelocity")  
-    bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)  
-    bv.Velocity = Vector3.zero  
-    bv.Parent = hrp  
+    local bv = Instance.new("BodyVelocity")
+    bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+    bv.Velocity = Vector3.zero
+    bv.Parent = hrp
 
-    while AutoCoinEnabled do  
+    while AutoCoinEnabled do
 
-        local distance = (hrp.Position - position).Magnitude  
+        -- verifica se a moeda ainda existe
+        if not target
+        or not target.Parent
+        or target.Transparency >= 1 then
+            break
+        end
 
-        if distance <= 0 then  
-            break  
-        end  
+        local position = target.Position
+        local distance = (hrp.Position - position).Magnitude
 
-        local direction = (position - hrp.Position).Unit  
+        -- chegou na moeda
+        if distance <= 2 then
+            break
+        end
 
-        bv.Velocity = direction * math.clamp(distance * 5, 5, speed)  
+        local direction = (position - hrp.Position).Unit
 
-        task.wait(0.03)  
-    end  
+        bv.Velocity = direction * math.clamp(distance * 5, 5, speed)
 
-    bv:Destroy()  
-    NoclipEnabled = false  
+        task.wait(0.03)
+    end
+
+    bv:Destroy()
+    NoclipEnabled = false
 end
 
 -- AIMBOT
