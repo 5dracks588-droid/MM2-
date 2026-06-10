@@ -357,7 +357,7 @@ CFrame = CFrame.new(nextPos)
 tween:Play()
 tween.Completed:Wait()
 
-task.wait(0.00)
+task.wait(0.03)
 
 end
 
@@ -1049,12 +1049,12 @@ if v then
 task.spawn(function()
 
 while AutoCoinEnabled do
-task.wait(1)
+task.wait(0)
 
 local coin = GetClosestCoin()
 
 if coin then
-FlyToPosition(coin.Position, 10)
+FlyToPosition(coin.Position, 5)
 end
 
 end
