@@ -322,7 +322,8 @@ end
 end)
 
 -- FLUTUAR ATÉ A COIN
-local function FlyToPosition(position, speed)
+local offset = Vector3.new(0, 2, 0)
+position = position + offset
 
     local char = LocalPlayer.Character
     if not char then return end
@@ -341,7 +342,7 @@ local function FlyToPosition(position, speed)
 
         local distance = (hrp.Position - position).Magnitude
 
-        if distance <= 3 then
+        if distance <= 0 then
             break
         end
 
