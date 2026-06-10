@@ -353,7 +353,7 @@ local function FlyToPosition(target, speed)
         local distance = (hrp.Position - position).Magnitude
 
         -- chegou na coin
-        if distance <= 2 then
+        if distance <= 0 then
             break
         end
 
