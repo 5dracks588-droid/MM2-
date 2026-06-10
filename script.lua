@@ -322,9 +322,8 @@ end
 end)
 
 -- FLUTUAR ATÉ A COIN
-local offset = Vector3.new(0, 2, 0)
-position = position + offset
-
+local function FlyToPosition(position, speed)
+    
     local char = LocalPlayer.Character
     if not char then return end
 
