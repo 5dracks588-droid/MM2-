@@ -871,7 +871,7 @@ CombatTab:Slider({
 Title = "Distância Aura",
 Step = 1,
 Value = {
-Min = 3,
+Min = 0,
 Max = 10,
 Default = 5
 },
@@ -963,13 +963,13 @@ local lobby = workspace:FindFirstChild("Lobby") or workspace:FindFirstChild("Lob
 if lobby then
 local spawnLocation = lobby:FindFirstChildWhichIsA("SpawnLocation", true)
 if spawnLocation then
-TeleportToCFrame(spawnLocation.CFrame * CFrame.new(0, 4, 0))
+TeleportToCFrame(spawnLocation.CFrame * CFrame.new(0, 5, 0))
 return
 end
 end
 local globalSpawn = workspace:FindFirstChildWhichIsA("SpawnLocation", true)
 if globalSpawn then
-TeleportToCFrame(globalSpawn.CFrame * CFrame.new(0, 4, 0))
+TeleportToCFrame(globalSpawn.CFrame * CFrame.new(0, 5, 0))
 return
 end
 TeleportToCFrame(CFrame.new(-108, 145, 12))
@@ -1071,7 +1071,7 @@ end
 
 FarmTab:Slider({
 Title = "Velocidade Auto Coin",
-Step = 1,
+Step = 5,
 Value = {
 Min = 10,
 Max = 100,
