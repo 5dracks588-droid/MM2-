@@ -1041,7 +1041,7 @@ if v then
 task.spawn(function()
 
 while AutoCoinEnabled do
-task.wait(0)
+task.wait(0.5)
 
 local coin = GetClosestCoin()
 
@@ -1061,9 +1061,9 @@ FarmTab:Slider({
 Title = "Velocidade Auto Coin",
 Step = 1,
 Value = {
-Min = 1,
-Max = 20,
-Default = 5
+Min = 10,
+Max = 100,
+Default = 50
 },
 Callback = function(v)
 AutoCoinSpeed = v
