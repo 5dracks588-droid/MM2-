@@ -348,12 +348,12 @@ local function FlyToPosition(target, speed)
             break
         end
 
-        local position = target.Position + Vector3.new(0, 2, 0)
+        local position = target.Position + Vector3.new(0, 1, 0)
 
         local distance = (hrp.Position - position).Magnitude
 
         -- chegou na coin
-        if distance <= 2 then
+        if distance <= 0 then
             break
         end
 
