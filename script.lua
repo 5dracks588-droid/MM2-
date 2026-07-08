@@ -24,6 +24,7 @@ Color = ColorSequence.new(
 Color3.fromHex("000000"), -- Preto
 Color3.fromHex("000000")  -- Preto
 ),
+        
 OnlyMobile = false,
 Enabled = true,
 Draggable = true,
