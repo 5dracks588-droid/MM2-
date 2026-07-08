@@ -51,6 +51,7 @@ local safeTpCount = 0
 local KnifeAuraEnabled = false
 local KnifeAuraDistance = 5
 local SavedPositions = {}
+local AutoCoinHideEnabled = false
 
 local EspEnabled = false
 local GunEspEnabled = false
@@ -367,6 +368,63 @@ local function FlyToPosition(target, speed)
 
     bv:Destroy()
 
+    NoclipEnabled = false
+end
+
+-- FLUTUAR ATÉ A COIN ESCONDIDO (POR BAIXO)
+local function FlyToPositionHide(target, speed)
+    local char = LocalPlayer.Character
+    if not char then return end
+
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+
+    if not target then return end
+
+    NoclipEnabled = true
+
+    local bv = Instance.new("BodyVelocity")
+    bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+    bv.Velocity = Vector3.zero
+    bv.Parent = hrp
+
+    while AutoCoinHideEnabled do
+        -- Verifica se a coin ainda existe
+        if not target or not target.Parent or target.Transparency >= 1 then
+            break
+        end
+
+        local coinPos = target.Position
+        -- Posição escondida: mesmo X e Z da moeda, mas 70 studs abaixo no eixo Y
+        local hidePos = Vector3.new(coinPos.X, coinPos.Y - 70, coinPos.Z)
+        local currentPos = hrp.Position
+        
+        -- Calcula a distância horizontal (X e Z) para ver se já estamos alinhados embaixo da moeda
+        local horizontalDistance = Vector2.new(currentPos.X - hidePos.X, currentPos.Z - hidePos.Z).Magnitude
+
+        local targetPos
+        if horizontalDistance > 5 then
+            -- Se não estiver alinhado, vai para a posição escondida (Y=-70)
+            targetPos = hidePos
+        else
+            -- Se já estiver exatamente embaixo da moeda, sobe reto para pegá-la
+            targetPos = coinPos + Vector3.new(0, 2, 0)
+        end
+
+        local distance = (currentPos - targetPos).Magnitude
+
+        -- Se chegou na moeda, encerra o loop
+        if distance <= 2 and targetPos == (coinPos + Vector3.new(0, 2, 0)) then
+            break
+        end
+
+        local direction = (targetPos - currentPos).Unit
+        bv.Velocity = direction * math.clamp(distance * 5, 5, speed)
+
+        task.wait(0.03)
+    end
+
+    if bv then bv:Destroy() end
     NoclipEnabled = false
 end
 
@@ -1112,6 +1170,28 @@ Default = 50
 Callback = function(v)
 AutoCoinSpeed = v
 end
+})
+
+-- AUTO TP COIN (HIDE / ESCONDIDO)
+FarmTab:Toggle({
+    Title = "Auto collect Coin (Hide)",
+    Default = false,
+    Callback = function(v)
+        AutoCoinHideEnabled = v
+
+        if v then
+            task.spawn(function()
+                while AutoCoinHideEnabled do
+                    task.wait(0.5)
+                    local coin = GetClosestCoin()
+                    
+                    if coin then
+                        FlyToPositionHide(coin, AutoCoinSpeed)
+                    end
+                end
+            end)
+        end
+    end
 })
 
 FarmTab:Toggle({
