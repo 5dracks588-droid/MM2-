@@ -19,17 +19,16 @@ Window:EditOpenButton({
 Title = "Open Menu",
 Icon = "zap",
 CornerRadius = UDim.new(0, 16),
-Scale = 1.2
 StrokeThickness = 2,
 Color = ColorSequence.new(
 Color3.fromHex("000000"), -- Preto
 Color3.fromHex("000000")  -- Preto
 ),
-      
 OnlyMobile = false,
 Enabled = true,
 Draggable = true,
 })
+
 -- Serviços
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
