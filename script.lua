@@ -833,6 +833,29 @@ end
 
 end)
 
+-- LOOP AUTO COLLECT GUN
+local AutoCollectGunEnabled = false
+task.spawn(function()
+    while true do
+        task.wait(0.1)
+        if AutoCollectGunEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            local gun = FindDroppedGun()
+            if gun then
+                local part = gun:IsA("BasePart") and gun or gun:FindFirstChildWhichIsA("BasePart")
+                if part then
+                    local currentHRP = LocalPlayer.Character.HumanoidRootPart
+                    local originalCFrame = currentHRP.CFrame
+                    
+                    -- Teleporta para a arma, espera coletar e volta
+                    currentHRP.CFrame = part.CFrame * CFrame.new(0, 2, 0)
+                    task.wait(0.2) -- Tempo para o jogo registrar a coleta
+                    currentHRP.CFrame = originalCFrame
+                end
+            end
+        end
+    end
+end)
+
 -- COMBATE
 CombatTab:Toggle({
 Title = "Aimbot",
@@ -877,6 +900,14 @@ Default = 5
 },
 Callback = function(v)
 KnifeAuraDistance = v
+end
+})
+
+CombatTab:Toggle({
+Title = "Auto Collect Gun",
+Default = false,
+Callback = function(v)
+    AutoCollectGunEnabled = v
 end
 })
 
