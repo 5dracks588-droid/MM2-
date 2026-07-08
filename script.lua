@@ -1,32 +1,31 @@
 -- WindUI
 local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
 
--- Window
+-- Windon
 local Window = WindUI:CreateWindow({
-Title = "Murder Mystery 2",
-Icon = "zap",
-Author = "zxred",
-Folder = "MM2WindUI",
-Size = UDim2.fromOffset(580,430),
-Transparent = true,
-Theme = "Dark",
-SideBarWidth = 200,
-MinimizeKey = Enum.KeyCode.RightControl
+    Title = "Red x Hub",
+    Icon = "zap",
+    Author = "ғᴇɪᴛᴏ ᴘᴏʀ ʀᴇᴅ",
+    Folder = "MuscleLegendsConfig",
+    Size = UDim2.fromOffset(580, 460),
+    Transparent = true,
+    Theme = "Red",
 })
 
--- AGORA VAI: Chamando a função direto da sua Window criada
 Window:EditOpenButton({
-Title = "Open Menu",
-Icon = "zap",
-CornerRadius = UDim.new(0, 16),
-StrokeThickness = 2,
-Color = ColorSequence.new(
-Color3.fromHex("000000"), -- Preto
-Color3.fromHex("000000")  -- Preto
-),
-OnlyMobile = false,
-Enabled = true,
-Draggable = true,
+    Title = "Open Menu",
+    Icon = "dumbbell",
+    CornerRadius = UDim.new(0.5, 0),
+    StrokeThickness = 3,
+    Enabled = true,
+    Draggable = true,
+    OnlyMobile = false,
+    Scale = 1.2,
+    Position = UDim2.new(0, 476, 0.08, 0),
+    Color = ColorSequence.new(
+        Color3.fromRGB(250, 0, 0),
+        Color3.fromRGB(255, 0, 0)
+    ),
 })
 
 -- Serviços
