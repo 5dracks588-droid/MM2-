@@ -3,7 +3,7 @@ local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footag
 
 -- Windon
 local Window = WindUI:CreateWindow({
-    Title = "Red x Hub",
+    Title = "Murderer Mistura 2",
     Icon = "zap",
     Author = "ғᴇɪᴛᴏ ᴘᴏʀ ʀᴇᴅ",
     Folder = "MuscleLegendsConfig",
@@ -14,7 +14,7 @@ local Window = WindUI:CreateWindow({
 
 Window:EditOpenButton({
     Title = "Open Menu",
-    Icon = "dumbbell",
+    Icon = "zap",
     CornerRadius = UDim.new(0.5, 0),
     StrokeThickness = 3,
     Enabled = true,
