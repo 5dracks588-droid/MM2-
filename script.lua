@@ -1,4 +1,4 @@
--- WindUI
+z-- WindUI
 local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
 
 -- Windon
@@ -495,67 +495,43 @@ end
 
 -- ESP
 local function UpdateESP()
-for _,p in pairs(Players:GetPlayers()) do
-if p ~= LocalPlayer and p.Character then
-local char = p.Character
+    for _,p in pairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Character then
+            local char = p.Character
 
-if EspEnabled and char:FindFirstChild("Head") and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 then
-local role = GetPlayerRole(p)
-local color = Color3.fromRGB(0,255,0)
+            -- Se o ESP estiver ativado e o jogador vivo
+            if EspEnabled and char:FindFirstChild("Head") and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 then
+                local role = GetPlayerRole(p)
+                local color = Color3.fromRGB(0,255,0) -- Verde (Inocente)
 
-if role == "Murderer" then
-color = Color3.fromRGB(255,0,0)
-elseif role == "Sheriff" then
-color = Color3.fromRGB(0,0,255)
-end
+                if role == "Murderer" then
+                    color = Color3.fromRGB(255,0,0) -- Vermelho
+                elseif role == "Sheriff" then
+                    color = Color3.fromRGB(0,0,255) -- Azul
+                end
 
--- Highlight
-local highlight = char:FindFirstChild("ESPHighlight")
-if not highlight then
-highlight = Instance.new("Highlight")
-highlight.Name = "ESPHighlight"
-highlight.Parent = char
-end
-highlight.FillColor = color
-highlight.OutlineColor = color
-highlight.FillTransparency = 0.5
-highlight.OutlineTransparency = 1
+                -- Se existirem textos antigos de distância/nome, apaga-os para não poluir
+                if char:FindFirstChild("ESPGui") then char.ESPGui:Destroy() end
 
--- Billboard
-local gui = char:FindFirstChild("ESPGui")
-if not gui then
-gui = Instance.new("BillboardGui")
-gui.Name = "ESPGui"
-gui.Size = UDim2.new(0,200,0,60)
-gui.AlwaysOnTop = true
-gui.ExtentsOffset = Vector3.new(0,3,0)
-gui.Parent = char
-end
-gui.Adornee = char.Head
+                -- Highlight (Apenas a cor do personagem e a borda)
+                local highlight = char:FindFirstChild("ESPHighlight")
+                if not highlight then
+                    highlight = Instance.new("Highlight")
+                    highlight.Name = "ESPHighlight"
+                    highlight.Parent = char
+                end
+                highlight.FillColor = color
+                highlight.OutlineColor = color
+                highlight.FillTransparency = 0.5
+                highlight.OutlineTransparency = 0 -- Borda 100% visível
 
-local label = gui:FindFirstChild("TextLabel")
-if not label then
-label = Instance.new("TextLabel")
-label.Size = UDim2.new(1,0,1,0)
-label.BackgroundTransparency = 1
-label.Font = Enum.Font.SourceSansBold
-label.TextSize = 14
-label.Parent = gui
-end
-label.TextColor3 = color
-
-local distance = math.floor((LocalPlayer.Character.HumanoidRootPart.Position - char.HumanoidRootPart.Position).Magnitude)
-label.Text = p.Name .. "\n" .. role .. "\n" .. distance .. " m"
-
-else
-if char:FindFirstChild("ESPHighlight") then char.ESPHighlight:Destroy() end
-if char:FindFirstChild("ESPGui") then char.ESPGui:Destroy() end
-end
-
-end
-
-end
-
+            else
+                -- Limpa o ESP se o jogador morrer ou se desativares a opção
+                if char:FindFirstChild("ESPHighlight") then char.ESPHighlight:Destroy() end
+                if char:FindFirstChild("ESPGui") then char.ESPGui:Destroy() end
+            end
+        end
+    end
 end
 
 -- FPS BOOSTER
