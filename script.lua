@@ -5,7 +5,7 @@ local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footag
 local Window = WindUI:CreateWindow({
 Title = "Murder Mystery 2",
 Icon = "zap",
-Author = "zxred",
+Author = "ʀᴇᴅ",
 Folder = "MM2WindUI",
 Size = UDim2.fromOffset(580,430),
 Transparent = true,
@@ -350,7 +350,7 @@ local function FlyToPosition(target, speed)
             break
         end
 
-        local position = target.Position + Vector3.new(0, 2, 0)
+        local position = target.Position + Vector3.new(0, 1, 0)
 
         local distance = (hrp.Position - position).Magnitude
 
@@ -361,7 +361,7 @@ local function FlyToPosition(target, speed)
 
         local direction = (position - hrp.Position).Unit
 
-        bv.Velocity = direction * math.clamp(distance * 5, 5, speed)
+        bv.Velocity = direction * math.clamp(distance * 10, 10, speed)
 
         task.wait(0.03)
     end
@@ -1099,7 +1099,7 @@ local gun = FindDroppedGun()
 if gun then
 local part = gun:IsA("BasePart") and gun or gun:FindFirstChildWhichIsA("BasePart")
 if part then
-TeleportToCFrame(part.CFrame * CFrame.new(0,2,0))
+TeleportToCFrame(part.CFrame * CFrame.new(0,0,0))
 end
 end
 end
