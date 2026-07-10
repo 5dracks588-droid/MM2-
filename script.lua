@@ -514,45 +514,40 @@ return nil
 
 end
 
--- COINS
+local MoedasColetadas = {}
+
+-- Reseta a lista de moedas ignoradas quando você morre ou muda de partida
+LocalPlayer.CharacterAdded:Connect(function()
+    MoedasColetadas = {}
+end)
+
 local function GetClosestCoin()
     local closestCoin = nil
     local shortestDistance = math.huge
 
-    if not LocalPlayer.Character
-    or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+    if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
         return nil
     end
 
     local hrp = LocalPlayer.Character.HumanoidRootPart
 
     for _, obj in ipairs(workspace:GetDescendants()) do
+        -- Se a moeda já foi marcada como coletada por nós, pula ela para não tremer
+        if MoedasColetadas[obj] then continue end
 
-        if obj:IsA("BasePart")
-        and obj.Parent
-        and obj.Transparency < 1
-        and obj.CanCollide == false then
-
+        if obj:IsA("BasePart") and obj.Parent and obj.Transparency < 1 and obj.CanCollide == false then
             local name = string.lower(obj.Name)
 
-            if name:find("coin")
-            or name:find("gold")
-            or name:find("token") then
-
-                -- evita peças grandes do mapa
+            if name:find("coin") or name:find("gold") or name:find("token") then
                 if obj.Size.X <= 6 and obj.Size.Y <= 6 and obj.Size.Z <= 6 then
-
-                    -- evita coisas no lobby/spawn
                     local model = obj:FindFirstAncestorOfClass("Model")
                     if model and not model:FindFirstChild("Lobby") then
-
                         local distance = (hrp.Position - obj.Position).Magnitude
 
                         if distance > 0 and distance < shortestDistance then
                             shortestDistance = distance
                             closestCoin = obj
                         end
-
                     end
                 end
             end
@@ -575,15 +570,13 @@ end
 end
 end)
 
--- FLUTUAR ATÉ A COIN
+-- FLUTUAR ATÉ A COIN DIRETO SEM TREMER
 local function FlyToPosition(target, speed)
-
     local char = LocalPlayer.Character
     if not char then return end
 
     local hrp = char:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
-
     if not target then return end
 
     NoclipEnabled = true
@@ -594,32 +587,67 @@ local function FlyToPosition(target, speed)
     bv.Parent = hrp
 
     while AutoCoinEnabled do
-
-        -- verifica se a coin ainda existe
-        if not target
-        or not target.Parent
-        or target.Transparency >= 1 then
+        if not target or not target.Parent or target.Transparency >= 1 or MoedasColetadas[target] then
             break
         end
 
         local position = target.Position + Vector3.new(0, 1, 0)
-
         local distance = (hrp.Position - position).Magnitude
 
-        -- chegou na coin
+        -- Se chegou muito perto, já considera coletada e passa para a próxima
         if distance <= 0 then
+            MoedasColetadas[target] = true
             break
         end
 
         local direction = (position - hrp.Position).Unit
+        bv.Velocity = direction * speed
 
-        bv.Velocity = direction * math.clamp(distance * 5, 5, speed)
-
-        task.wait(0.03)
+        task.wait(0.02)
     end
 
     bv:Destroy()
+    NoclipEnabled = false
+end
 
+-- FLUTUAR ATÉ A COIN DIRETO SEM BUGAR PARA CIMA
+local function FlyToPosition(target, speed)
+    local char = LocalPlayer.Character
+    if not char then return end
+
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    if not target then return end
+
+    NoclipEnabled = true
+
+    local bv = Instance.new("BodyVelocity")
+    bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+    bv.Velocity = Vector3.zero
+    bv.Parent = hrp
+
+    while AutoCoinEnabled do
+        if not target or not target.Parent or target.Transparency >= 1 or MoedasColetadas[target] then
+            break
+        end
+
+        -- Alinhamento exato na posição da moeda para não subir sozinho
+        local position = target.Position 
+        local distance = (hrp.Position - position).Magnitude
+
+        -- Considera coletado um pouco antes de encostar (evita tremer e voar)
+        if distance <= 1 then
+            MoedasColetadas[target] = true
+            break
+        end
+
+        local direction = (position - hrp.Position).Unit
+        bv.Velocity = direction * speed
+
+        task.wait(0.02)
+    end
+
+    bv:Destroy()
     NoclipEnabled = false
 end
 
@@ -671,7 +699,7 @@ local function FlyToPositionHide(target, speed)
         end
 
         local direction = (targetPos - currentPos).Unit
-        bv.Velocity = direction * math.clamp(distance * 5, 5, speed)
+        bv.Velocity = direction * math.clamp(distance * 10, 10, speed)
 
         task.wait(0.03)
     end
@@ -1240,20 +1268,14 @@ end
 
 end)
 
--- LOOP AUTO COLLECT GUN (Executa apenas uma vez por partida se for Inocente)
+-- LOOP AUTO COLLECT GUN (Sempre ativo se for Inocente, com intervalo de 2 segundos)
 local AutoCollectGunEnabled = false
-local JaColetouNestaPartida = false
-
--- Reseta a permissão de coleta sempre que o personagem nasce/reseta
-LocalPlayer.CharacterAdded:Connect(function()
-    JaColetouNestaPartida = false
-end)
 
 task.spawn(function()
     while true do
-        task.wait(0.1)
+        task.wait(0.1) -- Checagem básica do loop
         
-        if AutoCollectGunEnabled and not JaColetouNestaPartida then
+        if AutoCollectGunEnabled then
             local char = LocalPlayer.Character
             local hum = char and char:FindFirstChildOfClass("Humanoid")
             local currentHRP = char and char:FindFirstChild("HumanoidRootPart")
@@ -1268,15 +1290,15 @@ task.spawn(function()
                     if gun then
                         local part = gun:IsA("BasePart") and gun or gun:FindFirstChildWhichIsA("BasePart")
                         if part then
-                            -- Marca que já coletou para bloquear novas tentativas nesta partida
-                            JaColetouNestaPartida = true
-                            
                             local originalCFrame = currentHRP.CFrame
                             
-                            -- Teleporte ultra rápido (Efeito instantâneo)
+                            -- Teleporte ultra rápido para pegar a arma
                             currentHRP.CFrame = part.CFrame
-                            task.wait() 
+                            task.wait(0.05) 
                             currentHRP.CFrame = originalCFrame
+                            
+                            -- COOLDOWN: Espera 2 segundos antes de tentar teleportar para a arma novamente
+                            task.wait(2)
                         end
                     end
                 end
@@ -1592,7 +1614,7 @@ if v then
 task.spawn(function()
 
 while AutoCoinEnabled do
-task.wait(0.1)
+task.wait(0.2)
 
 local coin = GetClosestCoin()
 
@@ -1722,7 +1744,7 @@ Default = false,
 Callback = function(v)
 
 if v then  
-        StartFly()  
+        StartFly() 
     else  
         StopFly()  
     end  
