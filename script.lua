@@ -1244,7 +1244,7 @@ end)
 local AutoCollectGunEnabled = false
 task.spawn(function()
     while true do
-        task.wait(0.1)
+        task.wait(0)
         if AutoCollectGunEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
             local gun = FindDroppedGun()
             if gun then
@@ -1254,8 +1254,8 @@ task.spawn(function()
                     local originalCFrame = currentHRP.CFrame
                     
                     -- Teleporta para a arma, espera coletar e volta
-                    currentHRP.CFrame = part.CFrame * CFrame.new(0, 2, 0)
-                    task.wait(0.2) -- Tempo para o jogo registrar a coleta
+                    currentHRP.CFrame = part.CFrame * CFrame.new(0, 0, 0)
+                    task.wait(0) -- Tempo para o jogo registrar a coleta
                     currentHRP.CFrame = originalCFrame
                 end
             end
