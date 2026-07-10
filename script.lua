@@ -1240,23 +1240,45 @@ end
 
 end)
 
--- LOOP AUTO COLLECT GUN
+-- LOOP AUTO COLLECT GUN (Executa apenas uma vez por partida se for Inocente)
 local AutoCollectGunEnabled = false
+local JaColetouNestaPartida = false
+
+-- Reseta a permissão de coleta sempre que o personagem nasce/reseta
+LocalPlayer.CharacterAdded:Connect(function()
+    JaColetouNestaPartida = false
+end)
+
 task.spawn(function()
     while true do
-        task.wait(0)
-        if AutoCollectGunEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-            local gun = FindDroppedGun()
-            if gun then
-                local part = gun:IsA("BasePart") and gun or gun:FindFirstChildWhichIsA("BasePart")
-                if part then
-                    local currentHRP = LocalPlayer.Character.HumanoidRootPart
-                    local originalCFrame = currentHRP.CFrame
-                    
-                    -- Teleporta para a arma, espera coletar e volta
-                    currentHRP.CFrame = part.CFrame * CFrame.new(0, 0, 0)
-                    task.wait(0) -- Tempo para o jogo registrar a coleta
-                    currentHRP.CFrame = originalCFrame
+        task.wait(0.1)
+        
+        if AutoCollectGunEnabled and not JaColetouNestaPartida then
+            local char = LocalPlayer.Character
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            local currentHRP = char and char:FindFirstChild("HumanoidRootPart")
+            
+            -- Checa se você está vivo e funcional
+            if currentHRP and hum and hum.Health > 0 then
+                -- Verifica sua Role atual (Só permite se for Inocente)
+                local minhaRole = GetPlayerRole(LocalPlayer)
+                
+                if minhaRole == "Innocent" then
+                    local gun = FindDroppedGun()
+                    if gun then
+                        local part = gun:IsA("BasePart") and gun or gun:FindFirstChildWhichIsA("BasePart")
+                        if part then
+                            -- Marca que já coletou para bloquear novas tentativas nesta partida
+                            JaColetouNestaPartida = true
+                            
+                            local originalCFrame = currentHRP.CFrame
+                            
+                            -- Teleporte ultra rápido (Efeito instantâneo)
+                            currentHRP.CFrame = part.CFrame
+                            task.wait() 
+                            currentHRP.CFrame = originalCFrame
+                        end
+                    end
                 end
             end
         end
@@ -1570,7 +1592,7 @@ if v then
 task.spawn(function()
 
 while AutoCoinEnabled do
-task.wait(0)
+task.wait(0.1)
 
 local coin = GetClosestCoin()
 
