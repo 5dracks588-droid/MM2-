@@ -14,7 +14,7 @@ SideBarWidth = 200,
 MinimizeKey = Enum.KeyCode.RightControl
 })
 
--- AGORA VAI: Chamando a função direto da sua Window criada
+-- Chamando a função direto da sua Window criada
 Window:EditOpenButton({
 Title = "Open Menu",
 Icon = "zap",
@@ -35,6 +35,8 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Lighting = game:GetService("Lighting")
 local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local Vim = game:GetService("VirtualInputManager") -- Necessário para simular os cliques dos botões na tela
 
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
@@ -74,6 +76,12 @@ local moveVector = Vector3.zero
 
 local SelectedPlayerToTp = ""
 
+-- VARIÁVEIS DO SISTEMA DE FLING (Mecanismo Kilasik)
+local SelectedPlayerToFling = ""
+local FlingActive = false
+getgenv().OldPos = nil
+getgenv().FPDH = workspace.FallenPartsDestroyHeight
+
 -- FOV
 local FOVCircle = Drawing.new("Circle")
 FOVCircle.Color = Color3.fromRGB(0,0,0)
@@ -81,6 +89,200 @@ FOVCircle.Thickness = 2
 FOVCircle.Transparency = 1
 FOVCircle.Filled = false
 FOVCircle.Visible = false
+
+-- ====================================================================
+-- SISTEMA DOS NOVOS BOTÕES NA TELA (MANTENDO SEU CÓDIGO INTACTO)
+-- ====================================================================
+
+if game:GetService("CoreGui"):FindFirstChild("AreaCentroScreen") then
+    game:GetService("CoreGui").AreaCentroScreen:Destroy()
+end
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "AreaCentroScreen"
+pcall(function() ScreenGui.Parent = game:GetService("CoreGui") end)
+if not ScreenGui.Parent then ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
+
+local MurdererBtnConfig = { CanMove = false, CanResize = false, ToggleEnabled = false }
+local SheriffBtnConfig = { CanMove = false, CanResize = false, ToggleEnabled = false }
+
+-- 1. BOTÃO SHOT
+local BotaoShot = Instance.new("TextButton")
+BotaoShot.Name = "BotaoShot"
+BotaoShot.Parent = ScreenGui
+BotaoShot.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+BotaoShot.BackgroundTransparency = 0.5
+BotaoShot.BorderSizePixel = 0
+BotaoShot.Size = UDim2.new(0, 160, 0, 80)
+BotaoShot.Position = UDim2.new(1, -190, 0.5, -90)
+BotaoShot.Text = "SHOT"
+BotaoShot.TextColor3 = Color3.fromRGB(255, 255, 255)
+BotaoShot.Font = Enum.Font.GothamBold 
+BotaoShot.TextSize = 22 
+BotaoShot.Visible = false
+
+local StrokeShot = Instance.new("UIStroke")
+StrokeShot.Color = Color3.fromRGB(0, 0, 0)
+StrokeShot.Thickness = 4
+StrokeShot.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+StrokeShot.Parent = BotaoShot
+
+local CornerShot = Instance.new("UICorner")
+CornerShot.CornerRadius = UDim.new(0, 14)
+CornerShot.Parent = BotaoShot
+
+local ShotResize = Instance.new("Frame")
+ShotResize.Name = "ResizeCorner"
+ShotResize.Size = UDim2.new(0, 16, 0, 16)
+ShotResize.Position = UDim2.new(1, -16, 1, -16)
+ShotResize.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+ShotResize.BackgroundTransparency = 0.6
+ShotResize.Visible = false
+ShotResize.Parent = BotaoShot
+
+local ShotResizeCorner = Instance.new("UICorner")
+ShotResizeCorner.CornerRadius = UDim.new(1, 0)
+ShotResizeCorner.Parent = ShotResize
+
+-- 2. BOTÃO KNIFE
+local BotaoKnife = Instance.new("TextButton")
+BotaoKnife.Name = "BotaoKnife"
+BotaoKnife.Parent = ScreenGui
+BotaoKnife.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+BotaoKnife.BackgroundTransparency = 0.5
+BotaoKnife.BorderSizePixel = 0
+BotaoKnife.Size = UDim2.new(0, 160, 0, 80)
+BotaoKnife.Position = UDim2.new(1, -190, 0.5, 10)
+BotaoKnife.Text = "KNIFE"
+BotaoKnife.TextColor3 = Color3.fromRGB(255, 255, 255)
+BotaoKnife.Font = Enum.Font.GothamBold 
+BotaoKnife.TextSize = 22 
+BotaoKnife.Visible = false
+
+local StrokeKnife = Instance.new("UIStroke")
+StrokeKnife.Color = Color3.fromRGB(0, 0, 0)
+StrokeKnife.Thickness = 4
+StrokeKnife.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+StrokeKnife.Parent = BotaoKnife
+
+local CornerKnife = Instance.new("UICorner")
+CornerKnife.CornerRadius = UDim.new(0, 14)
+CornerKnife.Parent = BotaoKnife
+
+local KnifeResize = Instance.new("Frame")
+KnifeResize.Name = "ResizeCorner"
+KnifeResize.Size = UDim2.new(0, 16, 0, 16)
+KnifeResize.Position = UDim2.new(1, -16, 1, -16)
+KnifeResize.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+KnifeResize.BackgroundTransparency = 0.6
+KnifeResize.Visible = false
+KnifeResize.Parent = BotaoKnife
+
+local KnifeResizeCorner = Instance.new("UICorner")
+KnifeResizeCorner.CornerRadius = UDim.new(1, 0)
+KnifeResizeCorner.Parent = KnifeResize
+
+-- INTERAÇÃO DE ARRASTAR PARA CIMA DIMINUIR O TAMANHO
+local function SetupBotaoInteractions(btn, resizeCorner, config)
+    local dragging, dragStart, startPos
+    local resizing, resizeStart, startSize
+
+    btn.InputBegan:Connect(function(input)
+        if config.CanMove and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+            dragging = true
+            dragStart = input.Position
+            startPos = btn.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then dragging = false end
+            end)
+        end
+    end)
+
+    resizeCorner.InputBegan:Connect(function(input)
+        if config.CanResize and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+            resizing = true
+            resizeStart = input.Position
+            startSize = btn.Size
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then resizing = false end
+            end)
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and config.CanMove then
+            local delta = input.Position - dragStart
+            btn.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        elseif resizing and config.CanResize then
+            local delta = input.Position - resizeStart
+            local newWidth = math.max(60, startSize.X.Offset + delta.X)
+            -- delta.Y negativo significa arrastar para cima. Somando o delta, a altura diminui!
+            local newHeight = math.max(40, startSize.Y.Offset + delta.Y) 
+            btn.Size = UDim2.new(0, newWidth, 0, newHeight)
+        end
+    end)
+end
+
+SetupBotaoInteractions(BotaoShot, ShotResize, SheriffBtnConfig)
+SetupBotaoInteractions(BotaoKnife, KnifeResize, MurdererBtnConfig)
+
+-- Funções de Ação dos botões simulando o clique físico
+local function equiparItem(nomeItem)
+    local char = LocalPlayer.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    local backpack = LocalPlayer:FindFirstChild("Backpack")
+    if char and hum and backpack then
+        if char:FindFirstChild(nomeItem) then return true end
+        local item = backpack:FindFirstChild(nomeItem)
+        if item then hum:EquipTool(item) return true end
+    end
+    return false
+end
+
+local function dispararBotao(idDoToque, tipoAlvo)
+    local char = LocalPlayer.Character
+    local meuHrp = char and char:FindFirstChild("HumanoidRootPart")
+    local alvoHrp = nil
+    local menorDistancia = math.huge
+    
+    for _, v in pairs(Players:GetPlayers()) do
+        if v ~= LocalPlayer and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
+            local hrp = v.Character.HumanoidRootPart
+            if tipoAlvo == "Murderer" then
+                if v.Backpack:FindFirstChild("Knife") or v.Character:FindFirstChild("Knife") then alvoHrp = hrp break end
+            elseif tipoAlvo == "Proximo" then
+                if meuHrp then
+                    local distance = (meuHrp.Position - hrp.Position).Magnitude
+                    if distance < menorDistancia then menorDistancia = distance alvoHrp = hrp end
+                end
+            end
+        end
+    end
+    
+    if alvoHrp then
+        local telaPos, naTela = Camera:WorldToScreenPoint(alvoHrp.Position)
+        if naTela then
+            Vim:SendTouchEvent(idDoToque, 0, telaPos.X + 45, telaPos.Y + 60)
+            Vim:SendTouchEvent(idDoToque, 2, telaPos.X + 45, telaPos.Y + 60)
+        end
+    end
+end
+
+BotaoShot.MouseButton1Down:Connect(function()
+    equiparItem("Gun")
+    dispararBotao(9999, "Murderer")
+end)
+BotaoKnife.MouseButton1Down:Connect(function()
+    equiparItem("Knife")
+    dispararBotao(9998, "Proximo")
+end)
+
+task.spawn(function()
+    while task.wait(0.2) do
+        BotaoShot.Visible = SheriffBtnConfig.ToggleEnabled
+        BotaoKnife.Visible = MurdererBtnConfig.ToggleEnabled
+    end
+end)
 
 -- Tabs
 local InfoTab = Window:Tab({
@@ -91,6 +293,23 @@ Icon = "house"
 local CombatTab = Window:Tab({
 Title = "Combate",
 Icon = "sword"
+})
+
+-- ABA FLING ADICIONADA SEPARADAMENTE AQUI
+local FlingTab = Window:Tab({
+Title = "Fling",
+Icon = "wind"
+})
+
+-- NOVAS TABS ADICIONADAS EXATAMENTE AQUI SEM ALTERAR AS OUTRAS
+local MurdererTab = Window:Tab({
+Title = "Murderer",
+Icon = "skull"
+})
+
+local SherifeTab = Window:Tab({
+Title = "Sherife",
+Icon = "shield"
 })
 
 local EspTab = Window:Tab({
@@ -118,12 +337,45 @@ Title = "Desempenho",
 Icon = "cpu"
 })
 
+-- CONTEÚDO DA TAB MURDERER
+MurdererTab:Toggle({
+    Title = "Ativar Botão Knife",
+    Default = false,
+    Callback = function(v) MurdererBtnConfig.ToggleEnabled = v end
+})
+MurdererTab:Toggle({
+    Title = "Personalizar botão",
+    Default = false,
+    Callback = function(v) MurdererBtnConfig.CanResize = v KnifeResize.Visible = v end
+})
+MurdererTab:Toggle({
+    Title = "Mudar posição",
+    Default = false,
+    Callback = function(v) MurdererBtnConfig.CanMove = v end
+})
+
+-- CONTEÚDO DA TAB SHERIFE
+SherifeTab:Toggle({
+    Title = "Ativar Botão Shot",
+    Default = false,
+    Callback = function(v) SheriffBtnConfig.ToggleEnabled = v end
+})
+SherifeTab:Toggle({
+    Title = "Personalizar botão",
+    Default = false,
+    Callback = function(v) SheriffBtnConfig.CanResize = v ShotResize.Visible = v end
+})
+SherifeTab:Toggle({
+    Title = "Mudar posição",
+    Default = false,
+    Callback = function(v) SheriffBtnConfig.CanMove = v end
+})
+
 WindUI:SetTheme("Dark")
 
 -- SERVIÇOS
 local Stats = game:GetService("Stats")
 local HttpService = game:GetService("HttpService")
-local UserInputService = game:GetService("UserInputService")
 
 -- VARIÁVEIS
 local AutoCoinEnabled = false
@@ -721,7 +973,127 @@ UserInputService.JumpRequest:Connect(function()
     end
 end)
 
--- LOOP
+-- SISTEMA INTERNO DO MODO FLING ADAPTADO DE FORMA SEGURA
+local function ExecutarMecanismoFling(TargetPlayer)
+    if not TargetPlayer then return end
+    local char = LocalPlayer.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    local root = hum and hum.RootPart
+    
+    local tChar = TargetPlayer.Character
+    if not tChar then return end
+    
+    local tHum = tChar:FindFirstChildOfClass("Humanoid")
+    local tRoot = tHum and tHum.RootPart
+    local tHead = tChar:FindFirstChild("Head")
+    local acc = tChar:FindFirstChildOfClass("Accessory")
+    local handle = acc and acc:FindFirstChild("Handle")
+    
+    if char and hum and root then
+        if root.Velocity.Magnitude < 50 then
+            getgenv().OldPos = root.CFrame
+        end
+        
+        if tHum and tHum.Sit then return end
+        
+        if tHead then
+            workspace.CurrentCamera.CameraSubject = tHead
+        elseif handle then
+            workspace.CurrentCamera.CameraSubject = handle
+        elseif tHum and tRoot then
+            workspace.CurrentCamera.CameraSubject = tHum
+        end
+        
+        if not tChar:FindFirstChildWhichIsA("BasePart") then return end
+        
+        local animScript = char:FindFirstChild("Animate")
+        if animScript then animScript.Disabled = true end
+        local animator = hum:FindFirstChildOfClass("Animator")
+        if animator then
+            for _, track in ipairs(animator:GetPlayingAnimationTracks()) do track:Stop() end
+        end
+        
+        local FPos = function(BasePart, Pos, Ang)
+            root.CFrame = CFrame.new(BasePart.Position) * Pos * Ang
+            char:SetPrimaryPartCFrame(CFrame.new(BasePart.Position) * Pos * Ang)
+            root.Velocity = Vector3.new(9e7, 9e7 * 10, 9e7)
+            root.RotVelocity = Vector3.new(9e8, 9e8, 9e8)
+        end
+        
+        local SFBasePart = function(BasePart)
+            local TimeToWait = 5
+            local Time = tick()
+            local Angle = 0
+            
+            repeat
+                if root and tHum and tRoot then
+                    -- CONDIÇÃO DE CORTE: Se o jogador já voar rápido, cancela imediatamente
+                    if tRoot.AssemblyLinearVelocity.Magnitude > 150 then
+                        break
+                    end
+                    
+                    if BasePart.Velocity.Magnitude < 50 then
+                        Angle = (Angle + 35) % 360
+                        FPos(BasePart, CFrame.new(0, 1.5, 0) + tHum.MoveDirection * BasePart.Velocity.Magnitude / 1.25, CFrame.Angles(math.rad(Angle), 0, 0))
+                        task.wait()
+                        FPos(BasePart, CFrame.new(0, -1.5, 0) + tHum.MoveDirection * BasePart.Velocity.Magnitude / 1.25, CFrame.Angles(math.rad(Angle), 0, 0))
+                        task.wait()
+                    else
+                        Angle = (Angle + 35) % 360
+                        FPos(BasePart, CFrame.new(0, 1.5, tHum.WalkSpeed), CFrame.Angles(math.rad(Angle), 0, 0))
+                        task.wait()
+                        FPos(BasePart, CFrame.new(0, -1.5, -tHum.WalkSpeed), CFrame.Angles(math.rad(Angle), 0, 0))
+                        task.wait()
+                    end
+                else
+                    break
+                end
+            until Time + TimeToWait < tick() or not FlingActive
+        end
+        
+        workspace.FallenPartsDestroyHeight = 0/0
+        
+        local BV = Instance.new("BodyVelocity")
+        BV.Parent = root
+        BV.Velocity = Vector3.new(0, 0, 0)
+        BV.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+        
+        hum:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
+        
+        if tRoot then
+            SFBasePart(tRoot)
+        elseif tHead then
+            SFBasePart(tHead)
+        elseif handle then
+            SFBasePart(handle)
+        end
+        
+        BV:Destroy()
+        hum:SetStateEnabled(Enum.HumanoidStateType.Seated, true)
+        workspace.CurrentCamera.CameraSubject = hum
+        
+        if animScript then animScript.Disabled = false end
+        
+        if getgenv().OldPos then
+            local t = 0
+            repeat
+                root.CFrame = getgenv().OldPos * CFrame.new(0, .5, 0)
+                char:SetPrimaryPartCFrame(getgenv().OldPos * CFrame.new(0, .5, 0))
+                hum:ChangeState("GettingUp")
+                for _, part in pairs(char:GetChildren()) do
+                    if part:IsA("BasePart") then
+                        part.Velocity, part.RotVelocity = Vector3.zero, Vector3.zero
+                    end
+                end
+                task.wait()
+                t = t + 1
+            until (root.Position - getgenv().OldPos.p).Magnitude < 25 or t > 10
+            workspace.FallenPartsDestroyHeight = getgenv().FPDH
+        end
+    end
+end
+
+-- LOOP PRINCIPAL DO JOGO
 RunService.RenderStepped:Connect(function()
 -- FOV
 local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
@@ -946,6 +1318,85 @@ Callback = function(v)
 end
 })
 
+-- ====================================================================
+-- ESTRUTURA COMPLETA DA NOVA TAB "FLING" COM ATUALIZAÇÃO AUTOMÁTICA
+-- ====================================================================
+
+FlingTab:Button({
+Title = "Fling murderer",
+Callback = function()
+if FlingActive then return end
+local target = GetPlayerByRole("Murderer")
+if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+FlingActive = true
+task.spawn(function()
+ExecutarMecanismoFling(target)
+FlingActive = false
+end)
+end
+end
+})
+
+FlingTab:Button({
+Title = "Fling sherife",
+Callback = function()
+if FlingActive then return end
+local target = GetPlayerByRole("Sheriff")
+if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+FlingActive = true
+task.spawn(function()
+ExecutarMecanismoFling(target)
+FlingActive = false
+end)
+end
+end
+})
+
+local FlingDropdown = FlingTab:Dropdown({
+Title = "Lista de Jogadores",
+Values = GetPlayerNamesList(),
+Value = "",
+Callback = function(v) SelectedPlayerToFling = v end
+})
+
+FlingTab:Button({
+Title = "Fling player",
+Callback = function()
+if FlingActive then return end
+if SelectedPlayerToFling ~= "" then
+local target = Players:FindFirstChild(SelectedPlayerToFling)
+if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+FlingActive = true
+task.spawn(function()
+ExecutarMecanismoFling(target)
+FlingActive = false
+end)
+end
+end
+end
+})
+
+-- ESCUTADORES DA FILA DO SERVIDOR (Sincroniza sem precisar clicar em nada)
+local function AtualizarTodasAsListas()
+local novaLista = GetPlayerNamesList()
+FlingDropdown:Refresh(novaLista)
+if PlayerDropdown then
+PlayerDropdown:Refresh(novaLista)
+end
+end
+
+Players.PlayerAdded:Connect(function()
+task.wait(0.5) -- Pausa rápida estável para o motor carregar o ID
+AtualizarTodasAsListas()
+end)
+
+Players.PlayerRemoving:Connect(function(p)
+if SelectedPlayerToFling == p.Name then SelectedPlayerToFling = "" end
+if SelectedPlayerToTp == p.Name then SelectedPlayerToTp = "" end
+task.wait(0.1)
+AtualizarTodasAsListas()
+end)
+
 -- ESP
 EspTab:Toggle({
 Title = "ESP Jogadores",
@@ -986,7 +1437,7 @@ end
 })
 
 -- 3. Lista de jogadores
-local PlayerDropdown = TeleportTab:Dropdown({
+PlayerDropdown = TeleportTab:Dropdown({
 Title = "Escolher Jogador",
 Values = GetPlayerNamesList(),
 Value = "",
@@ -1006,11 +1457,11 @@ end
 end
 })
 
--- 5. Atualizar lista
+-- 5. Atualizar lista manual (Mantido apenas por redundância)
 TeleportTab:Button({
 Title = "Atualizar Lista",
 Callback = function()
-PlayerDropdown:Refresh(GetPlayerNamesList())
+AtualizarTodasAsListas()
 end
 })
 
