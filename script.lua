@@ -1119,7 +1119,7 @@ if v then
 task.spawn(function()
 
 while AutoCoinEnabled do
-task.wait(0.5)
+task.wait(0)
 
 local coin = GetClosestCoin()
 
@@ -1141,7 +1141,7 @@ Step = 5,
 Value = {
 Min = 10,
 Max = 100,
-Default = 50
+Default = 30
 },
 Callback = function(v)
 AutoCoinSpeed = v
