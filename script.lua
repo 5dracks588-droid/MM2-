@@ -1294,7 +1294,7 @@ task.spawn(function()
                             
                             -- Teleporte ultra rápido para pegar a arma
                             currentHRP.CFrame = part.CFrame
-                            task.wait(0.05) 
+                            task.wait(0) 
                             currentHRP.CFrame = originalCFrame
                             
                             -- COOLDOWN: Espera 2 segundos antes de tentar teleportar para a arma novamente
