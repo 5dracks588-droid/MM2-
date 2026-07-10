@@ -51,7 +51,7 @@ local SelectedTheme = "Dark"
 local AutoSafeEnabled = false
 local safeTpCount = 0
 local KnifeAuraEnabled = false
-local KnifeAuraDistance = 5
+local KnifeAuraDistance = 3
 local SavedPositions = {}
 local AutoCoinHideEnabled = false
 
@@ -379,7 +379,7 @@ local HttpService = game:GetService("HttpService")
 
 -- VARIÁVEIS
 local AutoCoinEnabled = false
-local AutoCoinSpeed = 50
+local AutoCoinSpeed = 30
 local CurrentTheme = "Dark"
 
 -- LABELS
