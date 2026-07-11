@@ -9,7 +9,7 @@ Author = "ʀᴇᴅ",
 Folder = "MM2WindUI",
 Size = UDim2.fromOffset(580,430),
 Transparent = true,
-Theme = "Dark",
+Theme = "Red",
 SideBarWidth = 200,
 MinimizeKey = Enum.KeyCode.RightControl
 })
@@ -18,11 +18,13 @@ MinimizeKey = Enum.KeyCode.RightControl
 Window:EditOpenButton({
 Title = "Open Menu",
 Icon = "zap",
-CornerRadius = UDim.new(0, 16),
-StrokeThickness = 2,
+CornerRadius = UDim.new(0.5, 0),
+StrokeThickness = 3,
+Scale = 1.2,
+Position = UDim2.new(0, 476, 0.08, 0),
 Color = ColorSequence.new(
-Color3.fromHex("000000"), -- Preto
-Color3.fromHex("000000")  -- Preto
+Color3.fromHex("FF0000"), -- Preto
+Color3.fromHex("FF0000")  -- Preto
 ),
         
 OnlyMobile = false,
@@ -47,7 +49,7 @@ local FovVisible = false
 local FovSize = 100
 local TargetType = "Murderer"
 local AutoCoinEnabled = false
-local SelectedTheme = "Dark"
+local SelectedTheme = "Red"
 local AutoSafeEnabled = false
 local safeTpCount = 0
 local KnifeAuraEnabled = false
@@ -84,7 +86,7 @@ getgenv().FPDH = workspace.FallenPartsDestroyHeight
 
 -- FOV
 local FOVCircle = Drawing.new("Circle")
-FOVCircle.Color = Color3.fromRGB(0,0,0)
+FOVCircle.Color = Color3.fromRGB(255,0,0)
 FOVCircle.Thickness = 2
 FOVCircle.Transparency = 1
 FOVCircle.Filled = false
@@ -243,24 +245,51 @@ local function dispararBotao(idDoToque, tipoAlvo)
     local char = LocalPlayer.Character
     local meuHrp = char and char:FindFirstChild("HumanoidRootPart")
     local alvoHrp = nil
+    local alvoHum = nil
     local menorDistancia = math.huge
     
     for _, v in pairs(Players:GetPlayers()) do
-        if v ~= LocalPlayer and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
+        if v ~= LocalPlayer and v.Character and v.Character:FindFirstChild("HumanoidRootPart") and v.Character:FindFirstChildOfClass("Humanoid") then
             local hrp = v.Character.HumanoidRootPart
+            local hum = v.Character:FindFirstChildOfClass("Humanoid")
             if tipoAlvo == "Murderer" then
-                if v.Backpack:FindFirstChild("Knife") or v.Character:FindFirstChild("Knife") then alvoHrp = hrp break end
+                if v.Backpack:FindFirstChild("Knife") or v.Character:FindFirstChild("Knife") then 
+                    alvoHrp = hrp 
+                    alvoHum = hum
+                    break 
+                end
             elseif tipoAlvo == "Proximo" then
                 if meuHrp then
                     local distance = (meuHrp.Position - hrp.Position).Magnitude
-                    if distance < menorDistancia then menorDistancia = distance alvoHrp = hrp end
+                    if distance < menorDistancia then 
+                        menorDistancia = distance 
+                        alvoHrp = hrp 
+                        alvoHum = hum
+                    end
                 end
             end
         end
     end
     
-    if alvoHrp then
-        local telaPos, naTela = Camera:WorldToScreenPoint(alvoHrp.Position)
+    if alvoHrp and alvoHum then
+        local posicaoFinal = alvoHrp.Position
+        
+        -- Verifica se o jogador está correndo/se movendo
+        if alvoHum.MoveDirection.Magnitude > 0 and meuHrp then
+            local direcaoParaMim = (meuHrp.Position - alvoHrp.Position).Unit
+            local direcaoMovimento = alvoHum.MoveDirection.Unit
+            
+            -- Calcula o produto escalar para saber se ele se move de frente/costas ou pros lados
+            local produtoEscalar = math.abs(direcaoMovimento:Dot(direcaoParaMim))
+            
+            -- Se o produto escalar for próximo de 1, ele se move na mesma linha (frente/costas)
+            -- Se for menor que 0.85, significa que ele está indo para os lados/cima/baixo em relação a você
+            if produtoEscalar < 0.85 then
+                posicaoFinal = posicaoFinal + (alvoHum.MoveDirection * 1) -- Adiciona 1 stud na frente da corrida
+            end
+        end
+
+        local telaPos, naTela = Camera:WorldToScreenPoint(posicaoFinal)
         if naTela then
             Vim:SendTouchEvent(idDoToque, 0, telaPos.X + 45, telaPos.Y + 60)
             Vim:SendTouchEvent(idDoToque, 2, telaPos.X + 45, telaPos.Y + 60)
@@ -636,7 +665,7 @@ local function FlyToPosition(target, speed)
         local distance = (hrp.Position - position).Magnitude
 
         -- Considera coletado um pouco antes de encostar (evita tremer e voar)
-        if distance <= 1 then
+        if distance <= 2 then
             MoedasColetadas[target] = true
             break
         end
@@ -1347,7 +1376,7 @@ Step = 1,
 Value = {
 Min = 0,
 Max = 10,
-Default = 5
+Default = 3
 },
 Callback = function(v)
 KnifeAuraDistance = v
@@ -1674,7 +1703,7 @@ AutoSafeEnabled = v
 if v then
 task.spawn(function()
 while AutoSafeEnabled do
-task.wait(0.00)
+task.wait(0)
 
 local char = LocalPlayer.Character
 if not char then continue end
