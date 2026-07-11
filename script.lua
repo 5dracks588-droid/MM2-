@@ -400,7 +400,7 @@ SherifeTab:Toggle({
     Callback = function(v) SheriffBtnConfig.CanMove = v end
 })
 
-WindUI:SetTheme("Dark")
+WindUI:SetTheme("Red")
 
 -- SERVIÇOS
 local Stats = game:GetService("Stats")
@@ -409,7 +409,7 @@ local HttpService = game:GetService("HttpService")
 -- VARIÁVEIS
 local AutoCoinEnabled = false
 local AutoCoinSpeed = 20
-local CurrentTheme = "Dark"
+local CurrentTheme = "Red"
 
 -- LABELS
 local PingParagraph = InfoTab:Paragraph({
