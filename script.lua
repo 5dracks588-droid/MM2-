@@ -21,7 +21,6 @@ Icon = "zap",
 CornerRadius = UDim.new(0.5, 0),
 StrokeThickness = 3,
 Scale = 1.2,
-Position = UDim2.new(0, 476, 0.08, 0),
 Color = ColorSequence.new(
 Color3.fromHex("FF0000"), -- Preto
 Color3.fromHex("FF0000")  -- Preto
