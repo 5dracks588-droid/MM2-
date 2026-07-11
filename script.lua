@@ -379,7 +379,7 @@ local HttpService = game:GetService("HttpService")
 
 -- VARIÁVEIS
 local AutoCoinEnabled = false
-local AutoCoinSpeed = 30
+local AutoCoinSpeed = 20
 local CurrentTheme = "Dark"
 
 -- LABELS
@@ -1636,7 +1636,7 @@ Step = 5,
 Value = {
 Min = 10,
 Max = 100,
-Default = 30
+Default = 20
 },
 Callback = function(v)
 AutoCoinSpeed = v
