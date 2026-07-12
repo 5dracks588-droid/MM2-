@@ -217,7 +217,6 @@ local function SetupBotaoInteractions(btn, resizeCorner, config)
         elseif resizing and config.CanResize then
             local delta = input.Position - resizeStart
             local newWidth = math.max(60, startSize.X.Offset + delta.X)
-            -- delta.Y negativo significa arrastar para cima. Somando o delta, a altura diminui!
             local newHeight = math.max(40, startSize.Y.Offset + delta.Y) 
             btn.Size = UDim2.new(0, newWidth, 0, newHeight)
         end
@@ -244,17 +243,14 @@ local function dispararBotao(idDoToque, tipoAlvo)
     local char = LocalPlayer.Character
     local meuHrp = char and char:FindFirstChild("HumanoidRootPart")
     local alvoHrp = nil
-    local alvoHum = nil
     local menorDistancia = math.huge
     
     for _, v in pairs(Players:GetPlayers()) do
         if v ~= LocalPlayer and v.Character and v.Character:FindFirstChild("HumanoidRootPart") and v.Character:FindFirstChildOfClass("Humanoid") then
             local hrp = v.Character.HumanoidRootPart
-            local hum = v.Character:FindFirstChildOfClass("Humanoid")
             if tipoAlvo == "Murderer" then
                 if v.Backpack:FindFirstChild("Knife") or v.Character:FindFirstChild("Knife") then 
                     alvoHrp = hrp 
-                    alvoHum = hum
                     break 
                 end
             elseif tipoAlvo == "Proximo" then
@@ -263,32 +259,15 @@ local function dispararBotao(idDoToque, tipoAlvo)
                     if distance < menorDistancia then 
                         menorDistancia = distance 
                         alvoHrp = hrp 
-                        alvoHum = hum
                     end
                 end
             end
         end
     end
     
-    if alvoHrp and alvoHum then
-        local posicaoFinal = alvoHrp.Position
-        
-        -- Verifica se o jogador está correndo/se movendo
-        if alvoHum.MoveDirection.Magnitude > 0 and meuHrp then
-            local direcaoParaMim = (meuHrp.Position - alvoHrp.Position).Unit
-            local direcaoMovimento = alvoHum.MoveDirection.Unit
-            
-            -- Calcula o produto escalar para saber se ele se move de frente/costas ou pros lados
-            local produtoEscalar = math.abs(direcaoMovimento:Dot(direcaoParaMim))
-            
-            -- Se o produto escalar for próximo de 1, ele se move na mesma linha (frente/costas)
-            -- Se for menor que 0.85, significa que ele está indo para os lados/cima/baixo em relação a você
-            if produtoEscalar < 0.85 then
-                posicaoFinal = posicaoFinal + (alvoHum.MoveDirection * 1) -- Adiciona 1 stud na frente da corrida
-            end
-        end
-
-        local telaPos, naTela = Camera:WorldToScreenPoint(posicaoFinal)
+    if alvoHrp then
+        -- Clica exatamente no centro atual do alvo sem calcular predição
+        local telaPos, naTela = Camera:WorldToScreenPoint(alvoHrp.Position)
         if naTela then
             Vim:SendTouchEvent(idDoToque, 0, telaPos.X + 45, telaPos.Y + 60)
             Vim:SendTouchEvent(idDoToque, 2, telaPos.X + 45, telaPos.Y + 60)
@@ -401,7 +380,7 @@ SherifeTab:Toggle({
 
 WindUI:SetTheme("Red")
 
--- SERVIÇOS
+-- SEDOS
 local Stats = game:GetService("Stats")
 local HttpService = game:GetService("HttpService")
 
@@ -560,7 +539,6 @@ local function GetClosestCoin()
     local hrp = LocalPlayer.Character.HumanoidRootPart
 
     for _, obj in ipairs(workspace:GetDescendants()) do
-        -- Se a moeda já foi marcada como coletada por nós, pula ela para não tremer
         if MoedasColetadas[obj] then continue end
 
         if obj:IsA("BasePart") and obj.Parent and obj.Transparency < 1 and obj.CanCollide == false then
@@ -622,7 +600,6 @@ local function FlyToPosition(target, speed)
         local position = target.Position + Vector3.new(0, 1, 0)
         local distance = (hrp.Position - position).Magnitude
 
-        -- Se chegou muito perto, já considera coletada e passa para a próxima
         if distance <= 0 then
             MoedasColetadas[target] = true
             break
@@ -659,11 +636,9 @@ local function FlyToPosition(target, speed)
             break
         end
 
-        -- Alinhamento exato na posição da moeda para não subir sozinho
         local position = target.Position 
         local distance = (hrp.Position - position).Magnitude
 
-        -- Considera coletado um pouco antes de encostar (evita tremer e voar)
         if distance <= 2 then
             MoedasColetadas[target] = true
             break
@@ -697,31 +672,25 @@ local function FlyToPositionHide(target, speed)
     bv.Parent = hrp
 
     while AutoCoinHideEnabled do
-        -- Verifica se a coin ainda existe
         if not target or not target.Parent or target.Transparency >= 1 then
             break
         end
 
         local coinPos = target.Position
-        -- Posição escondida: mesmo X e Z da moeda, mas 70 studs abaixo no eixo Y
         local hidePos = Vector3.new(coinPos.X, coinPos.Y - 70, coinPos.Z)
         local currentPos = hrp.Position
         
-        -- Calcula a distância horizontal (X e Z) para ver se já estamos alinhados embaixo da moeda
         local horizontalDistance = Vector2.new(currentPos.X - hidePos.X, currentPos.Z - hidePos.Z).Magnitude
 
         local targetPos
         if horizontalDistance > 5 then
-            -- Se não estiver alinhado, vai para a posição escondida (Y=-70)
             targetPos = hidePos
         else
-            -- Se já estiver exatamente embaixo da moeda, sobe reto para pegá-la
             targetPos = coinPos + Vector3.new(0, 2, 0)
         end
 
         local distance = (currentPos - targetPos).Magnitude
 
-        -- Se chegou na moeda, encerra o loop
         if distance <= 2 and targetPos == (coinPos + Vector3.new(0, 2, 0)) then
             break
         end
@@ -747,7 +716,6 @@ Camera.ViewportSize.X / 2,
 Camera.ViewportSize.Y / 2
 )
 
--- sua role
 local myRole = GetPlayerRole(LocalPlayer)
 
 for _,p in pairs(Players:GetPlayers()) do
@@ -762,11 +730,9 @@ local role = GetPlayerRole(p)
 
 local canTarget = false
 
--- se você for murderer -> mira em TODOS
 if myRole == "Murderer" then
 canTarget = true
 else
--- inocente/sheriff -> mira só no murderer
 if role == "Murderer" then
 canTarget = true
 end
@@ -807,21 +773,18 @@ local function UpdateESP()
         if p ~= LocalPlayer and p.Character then
             local char = p.Character
 
-            -- Se o ESP estiver ativado e o jogador vivo
             if EspEnabled and char:FindFirstChild("Head") and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 then
                 local role = GetPlayerRole(p)
-                local color = Color3.fromRGB(0,255,0) -- Verde (Inocente)
+                local color = Color3.fromRGB(0,255,0)
 
                 if role == "Murderer" then
-                    color = Color3.fromRGB(255,0,0) -- Vermelho
+                    color = Color3.fromRGB(255,0,0)
                 elseif role == "Sheriff" then
-                    color = Color3.fromRGB(0,0,255) -- Azul
+                    color = Color3.fromRGB(0,0,255)
                 end
 
-                -- Se existirem textos antigos de distância/nome, apaga-os para não poluir
                 if char:FindFirstChild("ESPGui") then char.ESPGui:Destroy() end
 
-                -- Highlight (Apenas a cor do personagem e a borda)
                 local highlight = char:FindFirstChild("ESPHighlight")
                 if not highlight then
                     highlight = Instance.new("Highlight")
@@ -831,10 +794,9 @@ local function UpdateESP()
                 highlight.FillColor = color
                 highlight.OutlineColor = color
                 highlight.FillTransparency = 0.5
-                highlight.OutlineTransparency = 0 -- Borda 100% visível
+                highlight.OutlineTransparency = 0
 
             else
-                -- Limpa o ESP se o jogador morrer ou se desativares a opção
                 if char:FindFirstChild("ESPHighlight") then char.ESPHighlight:Destroy() end
                 if char:FindFirstChild("ESPGui") then char.ESPGui:Destroy() end
             end
@@ -1083,7 +1045,6 @@ local function ExecutarMecanismoFling(TargetPlayer)
             
             repeat
                 if root and tHum and tRoot then
-                    -- CONDIÇÃO DE CORTE: Se o jogador já voar rápido, cancela imediatamente
                     if tRoot.AssemblyLinearVelocity.Magnitude > 150 then
                         break
                     end
@@ -1260,7 +1221,6 @@ if KnifeAuraEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirs
 
                 if distanceFromSafe > 50 then
 
-                    -- salva posição original
                     if not SavedPositions[plr] then
                         SavedPositions[plr] = targetHRP.CFrame
                     end
@@ -1278,7 +1238,6 @@ if KnifeAuraEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirs
     end
 
 else
-    -- restaura posição quando desativar
     for plr, savedCFrame in pairs(SavedPositions) do
         if plr
         and plr.Character
@@ -1301,16 +1260,14 @@ local AutoCollectGunEnabled = false
 
 task.spawn(function()
     while true do
-        task.wait(0.1) -- Checagem básica do loop
+        task.wait(0.1)
         
         if AutoCollectGunEnabled then
             local char = LocalPlayer.Character
             local hum = char and char:FindFirstChildOfClass("Humanoid")
             local currentHRP = char and char:FindFirstChild("HumanoidRootPart")
             
-            -- Checa se você está vivo e funcional
             if currentHRP and hum and hum.Health > 0 then
-                -- Verifica sua Role atual (Só permite se for Inocente)
                 local minhaRole = GetPlayerRole(LocalPlayer)
                 
                 if minhaRole == "Innocent" then
@@ -1320,12 +1277,10 @@ task.spawn(function()
                         if part then
                             local originalCFrame = currentHRP.CFrame
                             
-                            -- Teleporte ultra rápido para pegar a arma
                             currentHRP.CFrame = part.CFrame
                             task.wait(0) 
                             currentHRP.CFrame = originalCFrame
                             
-                            -- COOLDOWN: Espera 2 segundos antes de tentar teleportar para a arma novamente
                             task.wait(2)
                         end
                     end
@@ -1458,7 +1413,7 @@ end
 end
 
 Players.PlayerAdded:Connect(function()
-task.wait(0.5) -- Pausa rápida estável para o motor carregar o ID
+task.wait(0.5)
 AtualizarTodasAsListas()
 end)
 
@@ -1804,3 +1759,4 @@ OptimizeTextures()
 end
 end
 })
+
