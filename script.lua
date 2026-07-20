@@ -397,98 +397,34 @@ local function UpdateESP()
     end
 end
 
--- FPS BOOSTER AVANÇADO & CULLING
+-- FPS BOOSTER
 local function CleanObject(obj)
-    -- Deixa todas as texturas do mapa inteiramente lisas e leves
-    if obj:IsA("BasePart") or obj:IsA("MeshPart") or obj:IsA("Part") then
+    if obj:IsA("BasePart") and not obj:IsA("MeshPart") then
         obj.Material = Enum.Material.SmoothPlastic
         obj.Reflectance = 0
-        -- Se for uma MeshPart, remove as texturas mantendo apenas a forma
-        if obj:IsA("MeshPart") then
-            obj.TextureID = ""
-        end
-    -- Remove decalques, texturas, céus e atmosferas pesadas
-    elseif obj:IsA("Texture") or obj:IsA("Decal") or obj:IsA("Atmosphere") or obj:IsA("Sky") then
+    elseif obj:IsA("Texture") or obj:IsA("Decal") then
         obj:Destroy()
-    -- Desativa completamente qualquer tipo de partícula ou rastro
-    elseif obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Sparkles") or obj:IsA("Smoke") or obj:IsA("Fire") then
+    elseif obj:IsA("ParticleEmitter") or obj:IsA("Trail") then
         obj.Enabled = false
+    elseif obj:IsA("Atmosphere") or obj:IsA("Sky") then
+        obj:Destroy()
     end
 end
 
 local function OptimizeTextures()
-    -- Configurações globais de iluminação no mínimo absoluto
     Lighting.GlobalShadows = false
     Lighting.FogEnd = 9e9
-    Lighting.ShadowMapEnabled = false
-    
-    -- Força o motor gráfico do Roblox no nível mais baixo
     settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
-    sethiddenproperty(workspace.CurrentCamera, "HeadLocked", true) -- Pequeno ganho de renderização
-    
-    for _, obj in ipairs(workspace:GetDescendants()) do
+    for _,obj in ipairs(workspace:GetDescendants()) do
         CleanObject(obj)
     end
 end
 
--- Monitora novos objetos que entram no mapa
 workspace.DescendantAdded:Connect(function(descendant)
     if LowGraphicsEnabled then
-        task.wait()
+        task.wait(0.1)
         if descendant and descendant.Parent then
             CleanObject(descendant)
-        end
-    end
-end)
-
--- SISTEMA DE OCULTAR JOGADORES ATRÁS DA CÂMERA (CULLING)
-task.spawn(function()
-    while true do
-        task.wait(0.1) -- Loop rápido para checar o campo de visão
-        if LowGraphicsEnabled and Camera then
-            for _, p in ipairs(Players:GetPlayers()) do
-                if p ~= LocalPlayer and p.Character then
-                    local hrp = p.Character:FindFirstChild("HumanoidRootPart")
-                    if hrp then
-                        -- Transforma a posição do jogador em coordenadas de tela
-                        local _, onScreen = Camera:WorldToViewportPoint(hrp.Position)
-                        
-                        -- Se NÃO estiver na tela (atrás de você), esconde o personagem
-                        if not onScreen then
-                            for _, part in ipairs(p.Character:GetDescendants()) do
-                                if part:IsA("BasePart") or part:IsA("Decal") then
-                                    if not part:GetAttribute("OriginalTransparency") then
-                                        part:SetAttribute("OriginalTransparency", part.Transparency)
-                                    end
-                                    part.Transparency = 1 -- Invisível e leve para renderizar
-                                end
-                            end
-                        else
-                            -- Se voltou para a tela, renderiza normalmente
-                            for _, part in ipairs(p.Character:GetDescendants()) do
-                                if part:IsA("BasePart") or part:IsA("Decal") then
-                                    local original = part:GetAttribute("OriginalTransparency") or 0
-                                    part.Transparency = original
-                                end
-                            end
-                        end
-                    end
-                end
-            end
-        else
-            -- Se desativar o modo leve, devolve a visibilidade de todos os jogadores
-            for _, p in ipairs(Players:GetPlayers()) do
-                if p ~= LocalPlayer and p.Character then
-                    for _, part in ipairs(p.Character:GetDescendants()) do
-                        if part:IsA("BasePart") or part:IsA("Decal") then
-                            local original = part:GetAttribute("OriginalTransparency")
-                            if original then
-                                part.Transparency = original
-                            end
-                        end
-                    end
-                end
-            end
         end
     end
 end)
@@ -1097,14 +1033,12 @@ PlayerTab:Toggle({Title = "NoClip", Default = false, Callback = function(v) Nocl
 PlayerTab:Toggle({Title = "Fly", Default = false, Callback = function(v) if v then StartFly() else StopFly() end end})
 PlayerTab:Slider({Title = "Fly Speed", Step = 5, Value = {Min = 10, Max = 200, Default = 30}, Callback = function(v) FlySpeed = v end}) -- Padrão modificado para 30
 
--- PERFORMANCE
+-- DESEMPENHO CONFIGS
 PerformanceTab:Toggle({
-Title = "Modo Leve",
-Default = false,
-Callback = function(v)
-LowGraphicsEnabled = v
-if v then
-OptimizeTextures()
-end
-end
+    Title = "Modo Leve",
+    Default = false,
+    Callback = function(v)
+        LowGraphicsEnabled = v
+        if v then OptimizeTextures() end
+    end
 })
