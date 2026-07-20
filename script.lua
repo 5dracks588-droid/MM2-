@@ -1098,7 +1098,7 @@ PlayerTab:Toggle({Title = "Fly", Default = false, Callback = function(v) if v th
 PlayerTab:Slider({Title = "Fly Speed", Step = 5, Value = {Min = 10, Max = 200, Default = 30}, Callback = function(v) FlySpeed = v end}) -- Padrão modificado para 30
 
 -- DESEMPENHO CONFIGS
-PerformanceTab:Button({
+PerformanceTab:Togle({
     Title = "Modo Leve",
     Default = false,
     Callback = function(v)
