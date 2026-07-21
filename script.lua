@@ -1,4 +1,3 @@
---// WindUI (Link atualizado para evitar erro de carregamento)
 local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/refs/heads/main/dist/main.lua"))()
 
 --// Window
@@ -46,7 +45,7 @@ local FovVisible = false
 local FovSize = 100
 local AutoCoinEnabled = false
 local AutoCoinSpeed = 25
-local StopDuration = 0.25 -- Fixado em 0.5 segundos conforme solicitado
+local StopDuration = 0.25 -- Fixado em 0.25 segundos conforme solicitado
 local SelectedTheme = "Red"
 local AutoSafeEnabled = false
 local safeTpCount = 0
@@ -137,27 +136,27 @@ end)
 -- ROLE DETECTOR
 local function GetPlayerRole(player)
     if not player then return "Innocent" end
-    if player:FindFirstChild("PlayerData") and player.PlayerData:FindFirstChild("Role") then
-        return player.PlayerData.Role.Value
+
+    -- 1. Verificação por dados do jogo (se disponíveis)
+    local playerData = player:FindFirstChild("PlayerData")
+    if playerData and playerData:FindFirstChild("Role") then
+        return playerData.Role.Value
     end
+
+    -- 2. Busca pelas ferramentas na Mochila (não equipado) e no Personagem (equipado)
     local backpack = player:FindFirstChild("Backpack")
     local char = player.Character
-    if (backpack and backpack:FindFirstChild("Knife")) or (char and char:FindFirstChild("Knife")) then
+
+    local hasKnife = (backpack and backpack:FindFirstChild("Knife")) or (char and char:FindFirstChild("Knife"))
+    local hasGun = (backpack and backpack:FindFirstChild("Gun")) or (char and char:FindFirstChild("Gun"))
+
+    if hasKnife then
         return "Murderer"
-    end
-    if (backpack and backpack:FindFirstChild("Gun")) or (char and char:FindFirstChild("Gun")) then
+    elseif hasGun then
         return "Sheriff"
     end
-    return "Innocent"
-end
 
-local function GetPlayerByRole(roleName)
-    for _,p in pairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer and GetPlayerRole(p) == roleName then
-            return p
-        end
-    end
-    return nil
+    return "Innocent"
 end
 
 local function TeleportToCFrame(targetCFrame)
@@ -174,6 +173,15 @@ local function GetPlayerNamesList()
         end
     end
     return list
+end
+
+local function GetPlayerByRole(roleName)
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and GetPlayerRole(p) == roleName then
+            return p
+        end
+    end
+    return nil
 end
 
 -- SAFE AREA
@@ -689,7 +697,7 @@ RunService.RenderStepped:Connect(function()
             end
             highlight.FillColor = Color3.fromRGB(255, 255, 0)
             highlight.OutlineColor = Color3.fromRGB(255, 255, 0)
-            highlight.FillTransparency = 0.5
+            highlight.FillTransparency = 1
             highlight.OutlineTransparency = 1
 
 
@@ -764,7 +772,7 @@ task.spawn(function()
                             currentHRP.CFrame = part.CFrame
                             task.wait(0) 
                             currentHRP.CFrame = originalCFrame
-                            task.wait(2)
+                            task.wait(50)
                         end
                     end
                 end
@@ -774,13 +782,12 @@ task.spawn(function()
 end)
 
 -- COMBATE ELEMENTOS
-CombatTab:Toggle({Title = "Aim Lock", Default = false, Callback = function(v) AimbotEnabled = v end})
+CombatTab:Toggle({Title = "Aimbot", Default = false, Callback = function(v) AimbotEnabled = v end})
 CombatTab:Toggle({Title = "Mostrar FOV", Default = false, Callback = function(v) FovVisible = v end})
 CombatTab:Slider({Title = "FOV", Step = 1, Value = { Min = 50, Max = 500, Default = 100 }, Callback = function(v) FovSize = v end})
 CombatTab:Toggle({Title = "Anti Fling", Default = false, Callback = function(v) AntiFlingEnabled = v end})
 CombatTab:Toggle({Title = "Knife Aura", Default = false, Callback = function(v) KnifeAuraEnabled = v end})
 CombatTab:Slider({Title = "Distância Aura", Step = 1, Value = {Min = 0, Max = 10, Default = 3}, Callback = function(v) KnifeAuraDistance = v end})
-CombatTab:Toggle({Title = "Auto Collect Gun", Default = false, Callback = function(v) AutoCollectGunEnabled = v end})
 
 -- FLING ELEMENTOS
 FlingTab:Button({
@@ -1008,6 +1015,8 @@ FarmTab:Toggle({
         end
     end
 })
+
+FarmTab:Toggle({Title = "Auto Collect Gun", Default = false, Callback = function(v) AutoCollectGunEnabled = v end})
 
 -- PLAYER CONFIGS
 PlayerTab:Input({
