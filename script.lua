@@ -3,7 +3,7 @@ local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footag
 --// Window
 local Window = WindUI:CreateWindow({
 Title = "Murder Mystery 2",
-Icon = "zap",
+Icon = "crown",
 Author = "ʀᴇᴅ",
 Folder = "MM2WindUI",
 Size = UDim2.fromOffset(580,430),
@@ -16,12 +16,12 @@ MinimizeKey = Enum.KeyCode.RightControl
 -- Chamando a função direto da sua Window criada
 Window:EditOpenButton({
 Title = "Open Menu",
-Icon = "zap",
+Icon = "crown",
 CornerRadius = UDim.new(0.5, 0),
 StrokeThickness = 2,
 Color = ColorSequence.new(
 Color3.fromHex("FF0000"),
-Color3.fromHex("FF0000")
+Color3.fromHex("FFFFFF")
 ),
         
 OnlyMobile = false,
