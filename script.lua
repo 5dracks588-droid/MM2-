@@ -772,7 +772,7 @@ task.spawn(function()
                             currentHRP.CFrame = part.CFrame
                             task.wait(0) 
                             currentHRP.CFrame = originalCFrame
-                            task.wait(50)
+                            task.wait(0)
                         end
                     end
                 end
