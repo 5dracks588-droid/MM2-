@@ -770,7 +770,7 @@ task.spawn(function()
                         if part then
                             local originalCFrame = currentHRP.CFrame
                             currentHRP.CFrame = part.CFrame
-                            task.wait(0) 
+                            task.wait(5) 
                             currentHRP.CFrame = originalCFrame
                             task.wait(0)
                         end
