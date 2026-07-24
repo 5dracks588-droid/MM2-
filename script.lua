@@ -19,7 +19,7 @@ Title = "Open Menu",
 Icon = "crown",
 CornerRadius = UDim.new(0.5, 0),
 StrokeThickness = 2,
-Scale = 1.8,
+Scale = 1.5,
 Color = ColorSequence.new(
 Color3.fromHex("FF0000"),
 Color3.fromHex("FFFFFF")
