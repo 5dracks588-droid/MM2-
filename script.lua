@@ -755,7 +755,7 @@ end)
 local AutoCollectGunEnabled = false
 task.spawn(function()
     while true do
-        task.wait(0)
+        task.wait(5)
         if AutoCollectGunEnabled then
             local char = LocalPlayer.Character
             local hum = char and char:FindFirstChildOfClass("Humanoid")
@@ -770,7 +770,7 @@ task.spawn(function()
                         if part then
                             local originalCFrame = currentHRP.CFrame
                             currentHRP.CFrame = part.CFrame
-                            task.wait(5) 
+                            task.wait(0) 
                             currentHRP.CFrame = originalCFrame
                             task.wait(0)
                         end
