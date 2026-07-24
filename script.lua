@@ -19,6 +19,7 @@ Title = "Open Menu",
 Icon = "crown",
 CornerRadius = UDim.new(0.5, 0),
 StrokeThickness = 2,
+Scale = 2,
 Color = ColorSequence.new(
 Color3.fromHex("FF0000"),
 Color3.fromHex("FFFFFF")
@@ -684,36 +685,55 @@ RunService.RenderStepped:Connect(function()
 
     UpdateESP()
 
-    -- ESP GUN LIMPO (SEM TEXTO E SEM DISTÂNCIA)
-    local gun = FindDroppedGun()
-    if gun and GunEspEnabled then
-        local part = gun:IsA("BasePart") and gun or gun:FindFirstChildWhichIsA("BasePart")
-        if part then
-            local highlight = gun:FindFirstChild("GunHighlight")
-            if not highlight then
-                highlight = Instance.new("Highlight")
-                highlight.Name = "GunHighlight"
-                highlight.Parent = gun
-            end
-            highlight.FillColor = Color3.fromRGB(255, 255, 0)
-            highlight.OutlineColor = Color3.fromRGB(255, 255, 0)
-            highlight.FillTransparency = 1
-            highlight.OutlineTransparency = 1
-
-
-            -- Destrói qualquer BillboardGui de texto antigo para não mostrar nada na tela
-            if gun:FindFirstChild("GunGui") then 
-                gun.GunGui:Destroy() 
-            end
+    -- ESP GUN (COM TEXTO "GUN" EM AMARELO)
+local gun = FindDroppedGun()
+if gun and GunEspEnabled then
+    local part = gun:IsA("BasePart") and gun or gun:FindFirstChildWhichIsA("BasePart")
+    if part then
+        -- 1. Cria ou ajusta o Highlight (Brilho na arma)
+        local highlight = gun:FindFirstChild("GunHighlight")
+        if not highlight then
+            highlight = Instance.new("Highlight")
+            highlight.Name = "GunHighlight"
+            highlight.Parent = gun
         end
-    else
-        for _, obj in ipairs(workspace:GetChildren()) do
-            if obj.Name == "GunDrop" or (obj:IsA("Model") and obj.Name == "GunDrop") then
-                if obj:FindFirstChild("GunHighlight") then obj.GunHighlight:Destroy() end
-                if obj:FindFirstChild("GunGui") then obj.GunGui:Destroy() end
-            end
+        highlight.FillColor = Color3.fromRGB(255, 255, 0)
+        highlight.OutlineColor = Color3.fromRGB(255, 255, 0)
+        highlight.FillTransparency = 0.5
+        highlight.OutlineTransparency = 0
+
+        -- 2. Cria ou ajusta o BillboardGui (Texto na tela)
+        local gui = gun:FindFirstChild("GunGui")
+        if not gui then
+            gui = Instance.new("BillboardGui")
+            gui.Name = "GunGui"
+            gui.Adornee = part
+            gui.Size = UDim2.new(0, 100, 0, 30)
+            gui.StudsOffset = Vector3.new(0, 2, 0) -- Posição acima da arma
+            gui.AlwaysOnTop = true
+            gui.Parent = gun
+
+            local label = Instance.new("TextLabel")
+            label.Name = "GunLabel"
+            label.Size = UDim2.new(1, 0, 1, 0)
+            label.BackgroundTransparency = 1
+            label.Text = "Gun"
+            label.TextColor3 = Color3.fromRGB(255, 255, 0) -- Amarelo
+            label.TextSize = 14
+            label.Font = Enum.Font.SourceSansBold
+            label.TextStrokeTransparency = 0 -- Borda preta no texto para legibilidade
+            label.Parent = gui
         end
     end
+else
+    -- Limpa os efeitos caso o ESP seja desativado ou a arma suma
+    for _, obj in ipairs(workspace:GetChildren()) do
+        if obj.Name == "GunDrop" or (obj:IsA("Model") and obj.Name == "GunDrop") then
+            if obj:FindFirstChild("GunHighlight") then obj.GunHighlight:Destroy() end
+            if obj:FindFirstChild("GunGui") then obj.GunGui:Destroy() end
+        end
+    end
+end
 
     -- KNIFE AURA
     if KnifeAuraEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
