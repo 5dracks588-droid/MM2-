@@ -405,34 +405,42 @@ local function UpdateESP()
     end
 end
 
--- FPS BOOSTER
-local function CleanObject(obj)
-    if obj:IsA("BasePart") and not obj:IsA("MeshPart") then
-        obj.Material = Enum.Material.SmoothPlastic
-        obj.Reflectance = 0
-    elseif obj:IsA("Texture") or obj:IsA("Decal") then
-        obj:Destroy()
-    elseif obj:IsA("ParticleEmitter") or obj:IsA("Trail") then
-        obj.Enabled = false
-    elseif obj:IsA("Atmosphere") or obj:IsA("Sky") then
-        obj:Destroy()
-    end
-end
-
+-- NOVO FPS BOOSTER (ESTILO PLÁSTICO + SATURAÇÃO 1)
 local function OptimizeTextures()
     Lighting.GlobalShadows = false
     Lighting.FogEnd = 9e9
     settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
-    for _,obj in ipairs(workspace:GetDescendants()) do
-        CleanObject(obj)
+
+    -- 1. Deixa as texturas leves com material de plástico e remove decals pesados
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("BasePart") then
+            obj.Material = Enum.Material.SmoothPlastic
+            obj.Reflectance = 0
+        elseif obj:IsA("Texture") or obj:IsA("Decal") then
+            obj.Transparency = 1
+        end
     end
+
+    -- 2. Configura a saturação em 1 para manter as cores vivas e o estilo "anime"
+    local colorCorrection = Lighting:FindFirstChild("OptimizationColorCorrection")
+    if not colorCorrection then
+        colorCorrection = Instance.new("ColorCorrectionEffect")
+        colorCorrection.Name = "OptimizationColorCorrection"
+        colorCorrection.Parent = Lighting
+    end
+    colorCorrection.Saturation = 1
 end
 
 workspace.DescendantAdded:Connect(function(descendant)
     if LowGraphicsEnabled then
         task.wait(0.1)
         if descendant and descendant.Parent then
-            CleanObject(descendant)
+            if descendant:IsA("BasePart") then
+                descendant.Material = Enum.Material.SmoothPlastic
+                descendant.Reflectance = 0
+            elseif descendant:IsA("Texture") or descendant:IsA("Decal") then
+                descendant.Transparency = 1
+            end
         end
     end
 end)
