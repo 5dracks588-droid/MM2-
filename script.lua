@@ -21,7 +21,7 @@ CornerRadius = UDim.new(0.5, 0),
 StrokeThickness = 2,
 Color = ColorSequence.new(
 Color3.fromHex("FF0000"),
-Color3.fromHex("FFFFFF")
+Color3.fromHex("FF0000")
 ),
         
 OnlyMobile = false,
