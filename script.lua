@@ -20,8 +20,8 @@ Icon = "crown",
 CornerRadius = UDim.new(0.5, 0),
 StrokeThickness = 2,
 Color = ColorSequence.new(
-Color3.fromHex("FF0000"),
-Color3.fromHex("FF0000")
+Color3.fromHex("8B0000"),
+Color3.fromHex("000000")
 ),
         
 OnlyMobile = false,
@@ -35,17 +35,22 @@ local RunService = game:GetService("RunService")
 local Lighting = game:GetService("Lighting")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
--- Variáveis
+-- Variáveis de Role (GetPlayerData)
+local roles = {}
+local Murder, Sheriff, Hero
+
+-- Variáveis Gerais
 local AimbotEnabled = false
 local FovVisible = false
 local FovSize = 100
 local AutoCoinEnabled = false
 local AutoCoinSpeed = 25
-local StopDuration = 0.25 -- Fixado em 0.25 segundos conforme solicitado
+local StopDuration = 0.25 
 local SelectedTheme = "Red"
 local AutoSafeEnabled = false
 local safeTpCount = 0
@@ -66,7 +71,7 @@ local InfiniteJump = false
 local NoclipEnabled = false
 
 local FlyEnabled = false
-local FlySpeed = 30 -- Ajustado padrão para 30 conforme solicitado
+local FlySpeed = 30 
 
 local bodyVelocity
 local bodyGyro
@@ -76,7 +81,7 @@ local moveVector = Vector3.zero
 local SelectedPlayerToTp = ""
 local CurrentTarget = nil
 
--- VARIÁVEIS DO SISTEMA DE FLING (Mecanismo Kilasik)
+-- VARIÁVEIS DO SISTEMA DE FLING
 local SelectedPlayerToFling = ""
 local FlingActive = false
 getgenv().OldPos = nil
@@ -133,26 +138,48 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- ROLE DETECTOR
+---------------------------------------------------------------------------
+-- [SISTEMA DE ROLE DETECTOR OTIMIZADO VIA GETPLAYERDATA]
+---------------------------------------------------------------------------
+task.spawn(function()
+    while true do
+        local getPlayerData = ReplicatedStorage:FindFirstChild("GetPlayerData", true)
+        if getPlayerData then
+            pcall(function()
+                roles = getPlayerData:InvokeServer() or {}
+                Murder, Sheriff, Hero = nil, nil, nil
+                for name, data in pairs(roles) do
+                    if data.Role == "Murderer" then
+                        Murder = name
+                    elseif data.Role == "Sheriff" then
+                        Sheriff = name
+                    elseif data.Role == "Hero" then
+                        Hero = name
+                    end
+                end
+            end)
+        end
+        task.wait(0.5)
+    end
+end)
+
+local function IsAlive(player)
+    if not player or not roles[player.Name] then return false end
+    local playerData = roles[player.Name]
+    return not playerData.Killed and not playerData.Dead
+end
+
 local function GetPlayerRole(player)
     if not player then return "Innocent" end
+    if player.Name == Murder then return "Murderer" end
+    if player.Name == Sheriff or player.Name == Hero then return "Sheriff" end
 
-    -- 1. Verificação por dados do jogo (se disponíveis)
-    local playerData = player:FindFirstChild("PlayerData")
-    if playerData and playerData:FindFirstChild("Role") then
-        return playerData.Role.Value
-    end
-
-    -- 2. Busca pelas ferramentas na Mochila (não equipado) e no Personagem (equipado)
+    -- Fallback de segurança (caso o GetPlayerData ainda não tenha carregado)
     local backpack = player:FindFirstChild("Backpack")
     local char = player.Character
-
-    local hasKnife = (backpack and backpack:FindFirstChild("Knife")) or (char and char:FindFirstChild("Knife"))
-    local hasGun = (backpack and backpack:FindFirstChild("Gun")) or (char and char:FindFirstChild("Gun"))
-
-    if hasKnife then
+    if (backpack and backpack:FindFirstChild("Knife")) or (char and char:FindFirstChild("Knife")) then
         return "Murderer"
-    elseif hasGun then
+    elseif (backpack and backpack:FindFirstChild("Gun")) or (char and char:FindFirstChild("Gun")) then
         return "Sheriff"
     end
 
@@ -215,7 +242,7 @@ local function FindDroppedGun()
 end
 
 ---------------------------------------------------------------------------
--- [SISTEMA DE ANTI-FLING INTEGRADO (NOVO)]
+-- [SISTEMA DE ANTI-FLING INTEGRADO]
 ---------------------------------------------------------------------------
 RunService.Stepped:Connect(function()
     if AntiFlingEnabled then
@@ -232,7 +259,7 @@ RunService.Stepped:Connect(function()
 end)
 
 ---------------------------------------------------------------------------
--- [SISTEMA DE AUTO FARM COIN INTEGRADO (VELOCITY)]
+-- [SISTEMA DE AUTO FARM COIN INTEGRADO]
 ---------------------------------------------------------------------------
 local function GetClosestCoin()
     local char = LocalPlayer.Character
@@ -262,7 +289,6 @@ local function GetClosestCoin()
     return moedaAlvo
 end
 
--- Loop de Movimentação do Auto Coin Novo
 task.spawn(function()
     while true do
         task.wait(0.1)
@@ -275,7 +301,6 @@ task.spawn(function()
                 local alvo = GetClosestCoin()
                 
                 if alvo and alvo.Parent then
-                    -- Noclip temporário de movimentação
                     local noclipConnection
                     noclipConnection = RunService.Stepped:Connect(function()
                         if char then
@@ -329,7 +354,7 @@ task.spawn(function()
 
                     if not AutoCoinEnabled then break end
                     Coletadas[alvo] = true
-                    task.wait(StopDuration) -- Espera exatamente o tempo fixado (0.5s)
+                    task.wait(StopDuration)
                 else
                     task.wait(0.5)
                 end
@@ -351,7 +376,7 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- AIMBOT TARGETS (Procura apenas o assassino se você for xerife/inocente, ou todos se você for o assassino)
+-- AIMBOT TARGETS
 local function GetClosestPlayerToCenter()
     local closestPlayer = nil
     local shortestDistance = FovSize
@@ -386,49 +411,68 @@ local function GetClosestPlayerToCenter()
     return closestPlayer
 end
 
--- ESP SYSTEM
+---------------------------------------------------------------------------
+-- [NOVO ESP SISTEMA - INTEGRADO COM GETPLAYERDATA]
+---------------------------------------------------------------------------
+--// Função de verificação de jogador vivo (Funciona no Lobby e na Partida)
+local function IsAlive(player)
+    if not player or not player.Character then return false end
+    
+    local hum = player.Character:FindFirstChildOfClass("Humanoid")
+    if not hum or hum.Health <= 0 then return false end
+
+    -- Se a partida começou e o jogador está registrado no MM2, verifica o status da rodada
+    if roles and roles[player.Name] then
+        local playerData = roles[player.Name]
+        return not playerData.Killed and not playerData.Dead
+    end
+
+    -- Se estiver no Lobby (fora de partida/sem roles), considera vivo pela vida do personagem
+    return true
+end
+
+--// Função de atualização do ESP
 local function UpdateESP()
-    for _,p in pairs(Players:GetPlayers()) do
+    for _, p in ipairs(Players:GetPlayers()) do
         if p ~= LocalPlayer and p.Character then
             local char = p.Character
+            local highlight = char:FindFirstChild("ESPHighlight")
 
-            if EspEnabled and char:FindFirstChild("Head") and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 then
-                local role = GetPlayerRole(p)
-                local color = Color3.fromRGB(0,255,0)
-
-                if role == "Murderer" then
-                    color = Color3.fromRGB(255,0,0)
-                elseif role == "Sheriff" then
-                    color = Color3.fromRGB(0,0,255)
-                end
-
-                if char:FindFirstChild("ESPGui") then char.ESPGui:Destroy() end
-
-                local highlight = char:FindFirstChild("ESPHighlight")
+            if EspEnabled and IsAlive(p) then
                 if not highlight then
                     highlight = Instance.new("Highlight")
                     highlight.Name = "ESPHighlight"
                     highlight.Parent = char
                 end
+
+                local role = GetPlayerRole(p)
+                local color = Color3.fromRGB(0, 255, 0) -- Verde (Inocente / Lobby)
+
+                if role == "Murderer" then
+                    color = Color3.fromRGB(255, 0, 0) -- Vermelho (Assassino)
+                elseif role == "Sheriff" then
+                    color = Color3.fromRGB(0, 0, 255) -- Azul (Xerife)
+                end
+
                 highlight.FillColor = color
                 highlight.OutlineColor = color
                 highlight.FillTransparency = 0.5
                 highlight.OutlineTransparency = 0
             else
-                if char:FindFirstChild("ESPHighlight") then char.ESPHighlight:Destroy() end
-                if char:FindFirstChild("ESPGui") then char.ESPGui:Destroy() end
+                if highlight then
+                    highlight:Destroy()
+                end
             end
         end
     end
 end
 
--- NOVO FPS BOOSTER (ESTILO PLÁSTICO + SATURAÇÃO 1)
+-- NOVO FPS BOOSTER
 local function OptimizeTextures()
     Lighting.GlobalShadows = false
     Lighting.FogEnd = 9e9
     settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
 
-    -- 1. Deixa as texturas leves com material de plástico e remove decals pesados
     for _, obj in ipairs(workspace:GetDescendants()) do
         if obj:IsA("BasePart") then
             obj.Material = Enum.Material.SmoothPlastic
@@ -438,7 +482,6 @@ local function OptimizeTextures()
         end
     end
 
-    -- 2. Configura a saturação em 1 para manter as cores vivas e o estilo "anime"
     local colorCorrection = Lighting:FindFirstChild("OptimizationColorCorrection")
     if not colorCorrection then
         colorCorrection = Instance.new("ColorCorrectionEffect")
@@ -463,10 +506,6 @@ workspace.DescendantAdded:Connect(function(descendant)
 end)
 
 -- FLY SYSTEM
-local bodyVelocity
-local bodyGyro
-local flyConnection
-
 local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 local Humanoid = Character:WaitForChild("Humanoid")
 local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
@@ -605,15 +644,14 @@ local function ExecutarMecanismoFling(TargetPlayer)
             root.RotVelocity = Vector3.new(9e8, 9e8, 9e8)
         end
         
-        -- MOVIEMNTO DE FLING (10 STUDS FRENTE/TRÁS A VELOCIDADE 50 APENAS EM MOVIMENTO)
         local SFBasePart = function(BasePart)
             local TimeToWait = 5
             local Time = tick()
             local Angle = 0
             local progress = 0
             local movingForward = true
-            local flingSpeed = 50 -- Velocidade do movimento (50)
-            local distance = 10   -- Distância limite (10 studs)
+            local flingSpeed = 50
+            local distance = 10
             
             repeat
                 if root and tHum and tRoot then
@@ -624,13 +662,10 @@ local function ExecutarMecanismoFling(TargetPlayer)
                     Angle = (Angle + 45) % 360
                     local dt = task.wait()
                     
-                    -- Verifica se o jogador alvo está se movimentando
                     local isMoving = tHum.MoveDirection.Magnitude > 0.1 or BasePart.AssemblyLinearVelocity.Magnitude > 2
-                    
                     local offsetCFrame = CFrame.new(0, 0, 0)
                     
                     if isMoving then
-                        -- Lógica de frente e trás ativa apenas em movimento
                         if movingForward then
                             progress = progress + (flingSpeed * dt)
                             if progress >= distance then
@@ -648,12 +683,10 @@ local function ExecutarMecanismoFling(TargetPlayer)
                         local forwardVector = BasePart.CFrame.LookVector * progress
                         offsetCFrame = CFrame.new(forwardVector)
                     else
-                        -- Se o jogador estiver parado, reseta a distância e fica fixo nele
                         progress = 0
                         movingForward = true
                     end
                     
-                    -- Aplica a posição e a física do fling
                     FPos(BasePart, offsetCFrame, CFrame.Angles(math.rad(Angle), 0, 0))
                 else
                     break
@@ -710,7 +743,7 @@ RunService.RenderStepped:Connect(function()
     FOVCircle.Radius = FovSize
     FOVCircle.Visible = FovVisible
 
-    -- AIM LOCK INSTANTÂNEO (Trava a CFrame da câmera no oponente)
+    -- AIM LOCK INSTANTÂNEO
     if AimbotEnabled then
         local target = GetClosestPlayerToCenter()
         if target then
@@ -725,12 +758,11 @@ RunService.RenderStepped:Connect(function()
 
     UpdateESP()
 
-    -- ESP GUN (COM TEXTO "GUN" EM AMARELO)
+    -- ESP GUN (TEXTO "GUN" EM AMARELO)
     local gun = FindDroppedGun()
     if gun and GunEspEnabled then
         local part = gun:IsA("BasePart") and gun or gun:FindFirstChildWhichIsA("BasePart")
         if part then
-            -- 1. Cria ou ajusta o Highlight (Brilho na arma)
             local highlight = gun:FindFirstChild("GunHighlight")
             if not highlight then
                 highlight = Instance.new("Highlight")
@@ -742,14 +774,13 @@ RunService.RenderStepped:Connect(function()
             highlight.FillTransparency = 0.5
             highlight.OutlineTransparency = 0
 
-            -- 2. Cria ou ajusta o BillboardGui (Texto na tela)
             local gui = gun:FindFirstChild("GunGui")
             if not gui then
                 gui = Instance.new("BillboardGui")
                 gui.Name = "GunGui"
                 gui.Adornee = part
                 gui.Size = UDim2.new(0, 100, 0, 30)
-                gui.StudsOffset = Vector3.new(0, 2, 0) -- Posição acima da arma
+                gui.StudsOffset = Vector3.new(0, 2, 0)
                 gui.AlwaysOnTop = true
                 gui.Parent = gun
 
@@ -758,15 +789,14 @@ RunService.RenderStepped:Connect(function()
                 label.Size = UDim2.new(1, 0, 1, 0)
                 label.BackgroundTransparency = 1
                 label.Text = "Gun"
-                label.TextColor3 = Color3.fromRGB(255, 255, 0) -- Amarelo
+                label.TextColor3 = Color3.fromRGB(255, 255, 0)
                 label.TextSize = 14
                 label.Font = Enum.Font.SourceSansBold
-                label.TextStrokeTransparency = 0 -- Borda preta no texto para legibilidade
+                label.TextStrokeTransparency = 0
                 label.Parent = gui
             end
         end
     else
-        -- Limpa os efeitos caso o ESP seja desativado ou a arma suma
         for _, obj in ipairs(workspace:GetChildren()) do
             if obj.Name == "GunDrop" or (obj:IsA("Model") and obj.Name == "GunDrop") then
                 if obj:FindFirstChild("GunHighlight") then obj.GunHighlight:Destroy() end
@@ -1045,9 +1075,7 @@ TeleportTab:Button({
     end
 })
 
--- ====================================================================
--- COIN FARM ELEMENTOS (COOLDOWN REMOVIDO / CONFIGS SIMPLIFICADAS)
--- ====================================================================
+-- FARM ELEMENTOS
 FarmTab:Toggle({
     Title = "Auto collect Coin",
     Default = false,
@@ -1111,3 +1139,4 @@ PerformanceTab:Toggle({
         if v then OptimizeTextures() end
     end
 })
+
