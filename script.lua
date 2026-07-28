@@ -605,10 +605,15 @@ local function ExecutarMecanismoFling(TargetPlayer)
             root.RotVelocity = Vector3.new(9e8, 9e8, 9e8)
         end
         
+        -- MOVIEMNTO DE FLING (10 STUDS FRENTE/TRÁS A VELOCIDADE 50 APENAS EM MOVIMENTO)
         local SFBasePart = function(BasePart)
             local TimeToWait = 5
             local Time = tick()
             local Angle = 0
+            local progress = 0
+            local movingForward = true
+            local flingSpeed = 50 -- Velocidade do movimento (50)
+            local distance = 10   -- Distância limite (10 studs)
             
             repeat
                 if root and tHum and tRoot then
@@ -616,19 +621,40 @@ local function ExecutarMecanismoFling(TargetPlayer)
                         break
                     end
                     
-                    if BasePart.Velocity.Magnitude < 50 then
-                        Angle = (Angle + 35) % 360
-                        FPos(BasePart, CFrame.new(0, 1.5, 0) + tHum.MoveDirection * BasePart.Velocity.Magnitude / 1.25, CFrame.Angles(math.rad(Angle), 0, 0))
-                        task.wait()
-                        FPos(BasePart, CFrame.new(0, -1.5, 0) + tHum.MoveDirection * BasePart.Velocity.Magnitude / 1.25, CFrame.Angles(math.rad(Angle), 0, 0))
-                        task.wait()
+                    Angle = (Angle + 45) % 360
+                    local dt = task.wait()
+                    
+                    -- Verifica se o jogador alvo está se movimentando
+                    local isMoving = tHum.MoveDirection.Magnitude > 0.1 or BasePart.AssemblyLinearVelocity.Magnitude > 2
+                    
+                    local offsetCFrame = CFrame.new(0, 0, 0)
+                    
+                    if isMoving then
+                        -- Lógica de frente e trás ativa apenas em movimento
+                        if movingForward then
+                            progress = progress + (flingSpeed * dt)
+                            if progress >= distance then
+                                progress = distance
+                                movingForward = false
+                            end
+                        else
+                            progress = progress - (flingSpeed * dt)
+                            if progress <= 0 then
+                                progress = 0
+                                movingForward = true
+                            end
+                        end
+                        
+                        local forwardVector = BasePart.CFrame.LookVector * progress
+                        offsetCFrame = CFrame.new(forwardVector)
                     else
-                        Angle = (Angle + 35) % 360
-                        FPos(BasePart, CFrame.new(0, 1.5, tHum.WalkSpeed), CFrame.Angles(math.rad(Angle), 0, 0))
-                        task.wait()
-                        FPos(BasePart, CFrame.new(0, -1.5, -tHum.WalkSpeed), CFrame.Angles(math.rad(Angle), 0, 0))
-                        task.wait()
+                        -- Se o jogador estiver parado, reseta a distância e fica fixo nele
+                        progress = 0
+                        movingForward = true
                     end
+                    
+                    -- Aplica a posição e a física do fling
+                    FPos(BasePart, offsetCFrame, CFrame.Angles(math.rad(Angle), 0, 0))
                 else
                     break
                 end
