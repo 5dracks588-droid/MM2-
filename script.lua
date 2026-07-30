@@ -119,7 +119,7 @@ local PlayerTab = Window:Tab({Title = "Player", Icon = "user"})
 local PerformanceTab = Window:Tab({Title = "Desempenho", Icon = "cpu"})
 
 -- ORDEM CORRIGIDA: Role é o primeiro item da aba Info
-local RoleParagraph = InfoTab:Paragraph({Title = "Sua Role", Desc = "Carregando..."})
+local RoleParagraph = InfoTab:Paragraph({Title = "Time", Desc = "Carregando..."})
 local PingParagraph = InfoTab:Paragraph({Title = "Ping", Desc = "0 ms"})
 local FPSParagraph = InfoTab:Paragraph({Title = "FPS", Desc = "0 FPS"})
 local ServerParagraph = InfoTab:Paragraph({Title = "Servidor", Desc = "0/0"})
