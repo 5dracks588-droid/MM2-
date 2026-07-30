@@ -208,9 +208,9 @@ RunService.RenderStepped:Connect(function()
         local role = GetPlayerRole(LocalPlayer)
         local roleDesc = '<font color="#00FF00">Inocente</font>'
         if role == "Murderer" then
-            roleDesc = '<font color="#FF0000">Assassino (Murderer)</font>'
+            roleDesc = '<font color="#FF0000">Murderer</font>'
         elseif role == "Sheriff" then
-            roleDesc = '<font color="#0055FF">Xerife (Sheriff)</font>'
+            roleDesc = '<font color="#0055FF">Sheriff</font>'
         end
         RoleParagraph:SetDesc(roleDesc)
 
