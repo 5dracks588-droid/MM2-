@@ -8,7 +8,7 @@ Author = "ʀᴇᴅ",
 Folder = "MM2WindUI",
 Size = UDim2.fromOffset(580,430),
 Transparent = true,
-Theme = "Red",
+Theme = "Crimson",
 SideBarWidth = 200,
 MinimizeKey = Enum.KeyCode.RightControl
 })
@@ -51,7 +51,7 @@ local FovSize = 100
 local AutoCoinEnabled = false
 local AutoCoinSpeed = 25
 local StopDuration = 0.25 
-local SelectedTheme = "Red"
+local SelectedTheme = "Crimson"
 local AutoSafeEnabled = false
 local safeTpCount = 0
 local KnifeAuraEnabled = false
@@ -89,7 +89,7 @@ getgenv().FPDH = workspace.FallenPartsDestroyHeight
 
 -- FOV
 local FOVCircle = Drawing.new("Circle")
-FOVCircle.Color = Color3.fromRGB(255,0,0)
+FOVCircle.Color = Color3.fromRGB(139,0,0)
 FOVCircle.Thickness = 2
 FOVCircle.Transparency = 1
 FOVCircle.Filled = false
@@ -102,7 +102,7 @@ LocalPlayer.CharacterAdded:Connect(function()
     Coletadas = {}
 end)
 
-WindUI:SetTheme("Red")
+WindUI:SetTheme("Crimson")
 
 -- STATS
 local Stats = game:GetService("Stats")
