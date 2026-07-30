@@ -2,31 +2,30 @@ local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footag
 
 --// Window
 local Window = WindUI:CreateWindow({
-Title = "Murder Mystery 2",
-Icon = "crown",
-Author = "ʀᴇᴅ",
-Folder = "MM2WindUI",
-Size = UDim2.fromOffset(580,430),
-Transparent = true,
-Theme = "Crimson",
-SideBarWidth = 200,
-MinimizeKey = Enum.KeyCode.RightControl
+    Title = "Murder Mystery 2",
+    Icon = "crown",
+    Author = "ʀᴇᴅ",
+    Folder = "MM2WindUI",
+    Size = UDim2.fromOffset(580,430),
+    Transparent = true,
+    Theme = "Crimson",
+    SideBarWidth = 200,
+    MinimizeKey = Enum.KeyCode.RightControl
 })
 
 -- Chamando a função direto da sua Window criada
 Window:EditOpenButton({
-Title = "Open Menu",
-Icon = "crown",
-CornerRadius = UDim.new(0.5, 0),
-StrokeThickness = 2,
-Color = ColorSequence.new(
-Color3.fromHex("8B0000"),
-Color3.fromHex("000000")
-),
-        
-OnlyMobile = false,
-Enabled = true,
-Draggable = true,
+    Title = "Open Menu",
+    Icon = "crown",
+    CornerRadius = UDim.new(0.5, 0),
+    StrokeThickness = 2,
+    Color = ColorSequence.new(
+        Color3.fromHex("8B0000"),
+        Color3.fromHex("000000")
+    ),
+    OnlyMobile = false,
+    Enabled = true,
+    Draggable = true,
 })
 
 -- Serviços
@@ -81,11 +80,14 @@ local moveVector = Vector3.zero
 local SelectedPlayerToTp = ""
 local CurrentTarget = nil
 
--- VARIÁVEIS DO SISTEMA DE FLING
+-- VARIÁVEIS DO SISTEMA DE FLING E UI
 local SelectedPlayerToFling = ""
 local FlingActive = false
 getgenv().OldPos = nil
 getgenv().FPDH = workspace.FallenPartsDestroyHeight
+
+local FlingDropdown -- Declarado globalmente no escopo para não dar erro
+local PlayerDropdown -- Declarado globalmente no escopo para não dar erro
 
 -- FOV
 local FOVCircle = Drawing.new("Circle")
@@ -144,14 +146,30 @@ task.spawn(function()
                 end
             end)
         end
-        task.wait(0.5)
+        task.wait(2) -- Aumentado o delay para não dar rate limit no remote
     end
 end)
 
+-- [CORREÇÃO CRÍTICA] Nova função IsAlive mais segura
 local function IsAlive(player)
-    if not player or not roles or not roles[player.Name] then return false end
-    local playerData = roles[player.Name]
-    return not playerData.Killed and not playerData.Dead
+    if not player then return false end
+    if player.Character and player.Character:FindFirstChild("Humanoid") then
+        if player.Character.Humanoid.Health <= 0 then
+            return false
+        end
+    else
+        return false
+    end
+    
+    -- Checagem secundária caso a tabela roles exista
+    if roles and roles[player.Name] then
+        local playerData = roles[player.Name]
+        if playerData.Killed or playerData.Dead then
+            return false
+        end
+    end
+    
+    return true
 end
 
 local function GetPlayerRole(player)
@@ -185,7 +203,7 @@ local function GetPlayerRole(player)
     return "Innocent"
 end
 
--- FPS e Stats Loop (Atualiza o time do jogador com cor)
+-- FPS e Stats Loop
 local FPS = 0
 local Last = tick()
 
@@ -197,17 +215,16 @@ RunService.RenderStepped:Connect(function()
         FPSParagraph:SetDesc(FPS .. " FPS")
         ServerParagraph:SetDesc(#Players:GetPlayers() .. "/" .. Players.MaxPlayers)
         
-        -- Atualizar Time no InfoTab
         local myRole = GetPlayerRole(LocalPlayer)
         local roleText = "Inocente"
-        local roleColor = "#00FF00" -- Verde
+        local roleColor = "#00FF00" 
 
         if myRole == "Murderer" then
             roleText = "Assassino"
-            roleColor = "#FF0000" -- Vermelho
+            roleColor = "#FF0000" 
         elseif myRole == "Sheriff" then
             roleText = "Xerife"
-            roleColor = "#0000FF" -- Azul
+            roleColor = "#0000FF" 
         end
 
         RoleParagraph:SetDesc('<font color="' .. roleColor .. '"><b>' .. roleText .. '</b></font>')
@@ -219,7 +236,7 @@ end)
 
 local function TeleportToCFrame(targetCFrame)
     if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-        LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(targetCFrame.Position)
+        LocalPlayer.Character.HumanoidRootPart.CFrame = targetCFrame
     end
 end
 
@@ -290,7 +307,7 @@ RunService.Stepped:Connect(function()
 end)
 
 ---------------------------------------------------------------------------
--- [SISTEMA DE AUTO FARM COIN INTEGRADO COM CHECAGEM DE VIDA]
+-- [SISTEMA DE AUTO FARM COIN INTEGRADO]
 ---------------------------------------------------------------------------
 local function GetClosestCoin()
     local char = LocalPlayer.Character
@@ -326,15 +343,12 @@ task.spawn(function()
         while AutoCoinEnabled do
             local char = LocalPlayer.Character
             local hrp = char and char:FindFirstChild("HumanoidRootPart")
-            local hum = char and char:FindFirstChildOfClass("Humanoid")
             
-            -- Só coleta se o jogador estiver VIVO e PARTICIPANDO da partida
-            if hrp and hum and hum.Health > 0 and IsAlive(LocalPlayer) then
+            if hrp and IsAlive(LocalPlayer) then
                 local alvo = GetClosestCoin()
                 
                 if alvo and alvo.Parent then
-                    local noclipConnection
-                    noclipConnection = RunService.Stepped:Connect(function()
+                    local noclipConnection = RunService.Stepped:Connect(function()
                         if char then
                             for _, part in ipairs(char:GetChildren()) do
                                 if part:IsA("BasePart") then part.CanCollide = false end
@@ -397,14 +411,10 @@ task.spawn(function()
     end
 end)
 
--- NOCLIP GERAL DA TAB
+-- [CORREÇÃO] NOCLIP MELHORADO PARA NÃO CAIR DO MAPA
 RunService.Stepped:Connect(function()
-    if NoclipEnabled and LocalPlayer.Character then
-        for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.CanCollide = false
-            end
-        end
+    if NoclipEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+        LocalPlayer.Character.Humanoid:ChangeState(11)
     end
 end)
 
@@ -416,7 +426,7 @@ local function GetClosestPlayerToCenter()
     local myRole = GetPlayerRole(LocalPlayer)
 
     for _,p in pairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("Head") and p.Character:FindFirstChild("Humanoid") and p.Character.Humanoid.Health > 0 then
+        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("Head") and IsAlive(p) then
             local role = GetPlayerRole(p)
             local canTarget = false
 
@@ -826,7 +836,7 @@ RunService.RenderStepped:Connect(function()
         local myHRP = LocalPlayer.Character.HumanoidRootPart
 
         for _,plr in pairs(Players:GetPlayers()) do
-            if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") and plr.Character:FindFirstChild("Humanoid") and plr.Character.Humanoid.Health > 0 then
+            if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") and IsAlive(plr) then
                 local role = GetPlayerRole(plr)
                 if role == "Murderer" or role == "Sheriff" or role == "Innocent" then
                     local targetHRP = plr.Character.HumanoidRootPart
@@ -864,10 +874,9 @@ task.spawn(function()
         task.wait(0)
         if AutoCollectGunEnabled then
             local char = LocalPlayer.Character
-            local hum = char and char:FindFirstChildOfClass("Humanoid")
             local currentHRP = char and char:FindFirstChild("HumanoidRootPart")
             
-            if currentHRP and hum and hum.Health > 0 and IsAlive(LocalPlayer) then
+            if currentHRP and IsAlive(LocalPlayer) then
                 local minhaRole = GetPlayerRole(LocalPlayer)
                 if minhaRole == "Innocent" then
                     local gun = FindDroppedGun()
@@ -895,7 +904,32 @@ CombatTab:Toggle({Title = "Anti Fling", Default = false, Callback = function(v) 
 CombatTab:Toggle({Title = "Knife Aura", Default = false, Callback = function(v) KnifeAuraEnabled = v end})
 CombatTab:Slider({Title = "Distância Aura", Step = 1, Value = {Min = 0, Max = 10, Default = 3}, Callback = function(v) KnifeAuraDistance = v end})
 
--- FLING ELEMENTOS
+-- [CORREÇÃO] INICIANDO AS VARIÁVEIS ANTES DE CHAMAR A FUNÇÃO
+FlingDropdown = FlingTab:Dropdown({
+    Title = "Lista de Jogadores",
+    Values = GetPlayerNamesList(),
+    Value = "",
+    Callback = function(v) SelectedPlayerToFling = v end
+})
+
+local function AtualizarTodasAsListas()
+    local novaLista = GetPlayerNamesList()
+    if FlingDropdown then FlingDropdown:Refresh(novaLista) end
+    if PlayerDropdown then PlayerDropdown:Refresh(novaLista) end
+end
+
+Players.PlayerAdded:Connect(function()
+    task.wait(0.5)
+    AtualizarTodasAsListas()
+end)
+
+Players.PlayerRemoving:Connect(function(p)
+    if SelectedPlayerToFling == p.Name then SelectedPlayerToFling = "" end
+    if SelectedPlayerToTp == p.Name then SelectedPlayerToTp = "" end
+    task.wait(0.1)
+    AtualizarTodasAsListas()
+end)
+
 FlingTab:Button({
     Title = "Fling murderer",
     Callback = function()
@@ -926,13 +960,6 @@ FlingTab:Button({
     end
 })
 
-local FlingDropdown = FlingTab:Dropdown({
-    Title = "Lista de Jogadores",
-    Values = GetPlayerNamesList(),
-    Value = "",
-    Callback = function(v) SelectedPlayerToFling = v end
-})
-
 FlingTab:Button({
     Title = "Fling player",
     Callback = function()
@@ -949,26 +976,6 @@ FlingTab:Button({
         end
     end
 })
-
-local function AtualizarTodasAsListas()
-    local novaLista = GetPlayerNamesList()
-    FlingDropdown:Refresh(novaLista)
-    if PlayerDropdown then
-        PlayerDropdown:Refresh(novaLista)
-    end
-end
-
-Players.PlayerAdded:Connect(function()
-    task.wait(0.5)
-    AtualizarTodasAsListas()
-end)
-
-Players.PlayerRemoving:Connect(function(p)
-    if SelectedPlayerToFling == p.Name then SelectedPlayerToFling = "" end
-    if SelectedPlayerToTp == p.Name then SelectedPlayerToTp = "" end
-    task.wait(0.1)
-    AtualizarTodasAsListas()
-end)
 
 -- ESP ELEMENTOS
 EspTab:Toggle({Title = "ESP Jogadores", Default = false, Callback = function(v) EspEnabled = v end})
