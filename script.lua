@@ -171,6 +171,23 @@ end
 
 local function GetPlayerRole(player)
     if not player then return "Innocent" end
+    
+    -- VERIFICAÇÃO ADICIONADA: Se o jogo já distribuiu roles, mas esse jogador não tem, ele não tá na partida.
+    local isParticipating = false
+    if roles then
+        for nome, _ in pairs(roles) do
+            if nome == player.Name then
+                isParticipating = true
+                break
+            end
+        end
+    end
+    
+    -- Se a tabela de roles não estiver vazia (partida rolando) e o cara não tiver nela -> Inocente (Lobby)
+    if roles and next(roles) ~= nil and not isParticipating then
+        return "Innocent"
+    end
+
     if player.Name == Murder then return "Murderer" end
     if player.Name == Sheriff or player.Name == Hero then return "Sheriff" end
 
@@ -412,22 +429,21 @@ local function GetClosestPlayerToCenter()
 end
 
 ---------------------------------------------------------------------------
--- [NOVO ESP SISTEMA - INTEGRADO COM GETPLAYERDATA]
+-- [NOVO ESP SISTEMA - INTEGRADO COM GETPLAYERDATA E MORTOS VERDES]
 ---------------------------------------------------------------------------
---// Função de verificação de jogador vivo (Funciona no Lobby e na Partida)
-local function IsAlive(player)
+--// Função de verificação de jogador vivo
+local function IsPlayerAlive(player)
     if not player or not player.Character then return false end
     
     local hum = player.Character:FindFirstChildOfClass("Humanoid")
     if not hum or hum.Health <= 0 then return false end
 
-    -- Se a partida começou e o jogador está registrado no MM2, verifica o status da rodada
+    -- Verifica se o jogador foi morto na partida registrada
     if roles and roles[player.Name] then
         local playerData = roles[player.Name]
         return not playerData.Killed and not playerData.Dead
     end
 
-    -- Se estiver no Lobby (fora de partida/sem roles), considera vivo pela vida do personagem
     return true
 end
 
@@ -438,20 +454,24 @@ local function UpdateESP()
             local char = p.Character
             local highlight = char:FindFirstChild("ESPHighlight")
 
-            if EspEnabled and IsAlive(p) then
+            if EspEnabled then
                 if not highlight then
                     highlight = Instance.new("Highlight")
                     highlight.Name = "ESPHighlight"
                     highlight.Parent = char
                 end
 
-                local role = GetPlayerRole(p)
-                local color = Color3.fromRGB(0, 255, 0) -- Verde (Inocente / Lobby)
+                -- Por padrão, a cor é Verde (Inocente / Fora da Partida / Morto)
+                local color = Color3.fromRGB(0, 255, 0) 
 
-                if role == "Murderer" then
-                    color = Color3.fromRGB(255, 0, 0) -- Vermelho (Assassino)
-                elseif role == "Sheriff" then
-                    color = Color3.fromRGB(0, 0, 255) -- Azul (Xerife)
+                -- Só vai exibir a cor de Assassino/Xerife se o jogador ainda estiver VIVO na partida
+                if IsPlayerAlive(p) then
+                    local role = GetPlayerRole(p)
+                    if role == "Murderer" then
+                        color = Color3.fromRGB(255, 0, 0) -- Vermelho (Assassino)
+                    elseif role == "Sheriff" then
+                        color = Color3.fromRGB(0, 0, 255) -- Azul (Xerife)
+                    end
                 end
 
                 highlight.FillColor = color
@@ -1139,4 +1159,3 @@ PerformanceTab:Toggle({
         if v then OptimizeTextures() end
     end
 })
-
