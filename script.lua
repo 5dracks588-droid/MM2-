@@ -118,25 +118,11 @@ local FarmTab = Window:Tab({Title = "Farm", Icon = "coins"})
 local PlayerTab = Window:Tab({Title = "Player", Icon = "user"})
 local PerformanceTab = Window:Tab({Title = "Desempenho", Icon = "cpu"})
 
+-- ORDEM CORRIGIDA: Role é o primeiro item da aba Info
+local RoleParagraph = InfoTab:Paragraph({Title = "Sua Role", Desc = "Carregando..."})
 local PingParagraph = InfoTab:Paragraph({Title = "Ping", Desc = "0 ms"})
 local FPSParagraph = InfoTab:Paragraph({Title = "FPS", Desc = "0 FPS"})
 local ServerParagraph = InfoTab:Paragraph({Title = "Servidor", Desc = "0/0"})
-
--- FPS Loop
-local FPS = 0
-local Last = tick()
-
-RunService.RenderStepped:Connect(function()
-    FPS += 1
-    if tick() - Last >= 1 then
-        local ping = math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue())
-        PingParagraph:SetDesc(ping .. " ms")
-        FPSParagraph:SetDesc(FPS .. " FPS")
-        ServerParagraph:SetDesc(#Players:GetPlayers() .. "/" .. Players.MaxPlayers)
-        FPS = 0
-        Last = tick()
-    end
-end)
 
 ---------------------------------------------------------------------------
 -- [SISTEMA DE ROLE DETECTOR OTIMIZADO VIA GETPLAYERDATA]
@@ -169,10 +155,15 @@ local function IsAlive(player)
     return not playerData.Killed and not playerData.Dead
 end
 
+local function IsParticipatingAndAlive(player)
+    if not roles or not roles[player.Name] then return false end
+    local data = roles[player.Name]
+    return not data.Killed and not data.Dead
+end
+
 local function GetPlayerRole(player)
     if not player then return "Innocent" end
     
-    -- VERIFICAÇÃO ADICIONADA: Se o jogo já distribuiu roles, mas esse jogador não tem, ele não tá na partida.
     local isParticipating = false
     if roles then
         for nome, _ in pairs(roles) do
@@ -183,7 +174,6 @@ local function GetPlayerRole(player)
         end
     end
     
-    -- Se a tabela de roles não estiver vazia (partida rolando) e o cara não tiver nela -> Inocente (Lobby)
     if roles and next(roles) ~= nil and not isParticipating then
         return "Innocent"
     end
@@ -191,7 +181,6 @@ local function GetPlayerRole(player)
     if player.Name == Murder then return "Murderer" end
     if player.Name == Sheriff or player.Name == Hero then return "Sheriff" end
 
-    -- Fallback de segurança (caso o GetPlayerData ainda não tenha carregado)
     local backpack = player:FindFirstChild("Backpack")
     local char = player.Character
     if (backpack and backpack:FindFirstChild("Knife")) or (char and char:FindFirstChild("Knife")) then
@@ -202,6 +191,33 @@ local function GetPlayerRole(player)
 
     return "Innocent"
 end
+
+-- FPS e Info Loop atualizado
+local FPS = 0
+local Last = tick()
+
+RunService.RenderStepped:Connect(function()
+    FPS += 1
+    if tick() - Last >= 1 then
+        local ping = math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue())
+        PingParagraph:SetDesc(ping .. " ms")
+        FPSParagraph:SetDesc(FPS .. " FPS")
+        ServerParagraph:SetDesc(#Players:GetPlayers() .. "/" .. Players.MaxPlayers)
+        
+        -- Atualiza a role com cores (Inocente = Verde, Xerife = Azul, Murderer = Vermelho)
+        local role = GetPlayerRole(LocalPlayer)
+        local roleDesc = '<font color="#00FF00">Inocente</font>'
+        if role == "Murderer" then
+            roleDesc = '<font color="#FF0000">Assassino (Murderer)</font>'
+        elseif role == "Sheriff" then
+            roleDesc = '<font color="#0055FF">Xerife (Sheriff)</font>'
+        end
+        RoleParagraph:SetDesc(roleDesc)
+
+        FPS = 0
+        Last = tick()
+    end
+end)
 
 local function TeleportToCFrame(targetCFrame)
     if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
@@ -314,7 +330,8 @@ task.spawn(function()
             local hrp = char and char:FindFirstChild("HumanoidRootPart")
             local hum = char and char:FindFirstChildOfClass("Humanoid")
             
-            if hrp and hum and hum.Health > 0 then
+            -- Funciona apenas se estiver participando e vivo
+            if hrp and hum and hum.Health > 0 and IsParticipatingAndAlive(LocalPlayer) then
                 local alvo = GetClosestCoin()
                 
                 if alvo and alvo.Parent then
@@ -431,14 +448,12 @@ end
 ---------------------------------------------------------------------------
 -- [NOVO ESP SISTEMA - INTEGRADO COM GETPLAYERDATA E MORTOS VERDES]
 ---------------------------------------------------------------------------
---// Função de verificação de jogador vivo
 local function IsPlayerAlive(player)
     if not player or not player.Character then return false end
     
     local hum = player.Character:FindFirstChildOfClass("Humanoid")
     if not hum or hum.Health <= 0 then return false end
 
-    -- Verifica se o jogador foi morto na partida registrada
     if roles and roles[player.Name] then
         local playerData = roles[player.Name]
         return not playerData.Killed and not playerData.Dead
@@ -447,7 +462,6 @@ local function IsPlayerAlive(player)
     return true
 end
 
---// Função de atualização do ESP
 local function UpdateESP()
     for _, p in ipairs(Players:GetPlayers()) do
         if p ~= LocalPlayer and p.Character then
@@ -461,16 +475,14 @@ local function UpdateESP()
                     highlight.Parent = char
                 end
 
-                -- Por padrão, a cor é Verde (Inocente / Fora da Partida / Morto)
                 local color = Color3.fromRGB(0, 255, 0) 
 
-                -- Só vai exibir a cor de Assassino/Xerife se o jogador ainda estiver VIVO na partida
                 if IsPlayerAlive(p) then
                     local role = GetPlayerRole(p)
                     if role == "Murderer" then
-                        color = Color3.fromRGB(255, 0, 0) -- Vermelho (Assassino)
+                        color = Color3.fromRGB(255, 0, 0) 
                     elseif role == "Sheriff" then
-                        color = Color3.fromRGB(0, 0, 255) -- Azul (Xerife)
+                        color = Color3.fromRGB(0, 0, 255) 
                     end
                 end
 
@@ -1115,7 +1127,7 @@ FarmTab:Toggle({
                 while AutoSafeEnabled do
                     task.wait(0)
                     local char = LocalPlayer.Character
-                    if char and GetPlayerRole(LocalPlayer) == "Innocent" then
+                    if char and char:FindFirstChild("HumanoidRootPart") then
                         TeleportToSafeArea()
                     end
                 end
