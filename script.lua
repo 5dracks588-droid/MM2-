@@ -206,7 +206,7 @@ RunService.RenderStepped:Connect(function()
         
         -- Atualiza a role com cores (Inocente = Verde, Xerife = Azul, Murderer = Vermelho)
         local role = GetPlayerRole(LocalPlayer)
-        local roleDesc = '<font color="#00FF00">Inocente</font>'
+        local roleDesc = '<font color="#00FF00">Innocent</font>'
         if role == "Murderer" then
             roleDesc = '<font color="#FF0000">Murderer</font>'
         elseif role == "Sheriff" then
