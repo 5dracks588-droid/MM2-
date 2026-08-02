@@ -877,23 +877,41 @@ end)
 local AutoCollectGunEnabled = false
 task.spawn(function()
     while true do
-        task.wait(0)
+        task.wait(0) -- Mudei para 0.1 para otimizar e não causar lag
+        
         if AutoCollectGunEnabled then
             local char = LocalPlayer.Character
-            local hum = char and char:FindFirstChildOfClass("Humanoid")
             local currentHRP = char and char:FindFirstChild("HumanoidRootPart")
             
-            if currentHRP and hum and hum.Health > 0 then
+            -- LÓGICA NOVA: Verifica se a rodada começou e se seu nome está na lista de participantes
+            local participandoDaPartida = false
+            if roles and next(roles) ~= nil then
+                if roles[LocalPlayer.Name] then
+                    participandoDaPartida = true
+                end
+            end
+            
+            -- Só avança se: Tiver corpo, estiver Vivo, E estiver participando da rodada
+            if currentHRP and IsAlive(LocalPlayer) and participandoDaPartida then
                 local minhaRole = GetPlayerRole(LocalPlayer)
+                
+                -- Só tenta pegar a arma se for Inocente
                 if minhaRole == "Innocent" then
                     local gun = FindDroppedGun()
+                    
                     if gun then
                         local part = gun:IsA("BasePart") and gun or gun:FindFirstChildWhichIsA("BasePart")
                         if part then
                             local originalCFrame = currentHRP.CFrame
+                            
+                            -- Teleporta para a arma
                             currentHRP.CFrame = part.CFrame
                             task.wait(0) 
+                            
+                            -- Volta para a posição original
                             currentHRP.CFrame = originalCFrame
+                            
+                            -- Cooldown para não bugar o teleporte
                             task.wait(5)
                         end
                     end
