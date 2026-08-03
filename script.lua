@@ -2,31 +2,29 @@ local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footag
 
 --// Window
 local Window = WindUI:CreateWindow({
-Title = "Murder Mystery 2",
-Icon = "crown",
-Author = "ʀᴇᴅ",
-Folder = "MM2WindUI",
-Size = UDim2.fromOffset(580,430),
-Transparent = true,
-Theme = "Crimson",
-SideBarWidth = 200,
-MinimizeKey = Enum.KeyCode.RightControl
+    Title = "Murder Mystery 2",
+    Icon = "crown",
+    Author = "ʀᴇᴅ",
+    Folder = "MM2WindUI",
+    Size = UDim2.fromOffset(580,430),
+    Transparent = true,
+    Theme = "Crimson",
+    SideBarWidth = 200,
+    MinimizeKey = Enum.KeyCode.RightControl
 })
 
--- Chamando a função direto da sua Window criada
 Window:EditOpenButton({
-Title = "Open Menu",
-Icon = "crown",
-CornerRadius = UDim.new(0.5, 0),
-StrokeThickness = 2,
-Color = ColorSequence.new(
-Color3.fromHex("8B0000"),
-Color3.fromHex("000000")
-),
-        
-OnlyMobile = false,
-Enabled = true,
-Draggable = true,
+    Title = "Open Menu",
+    Icon = "crown",
+    CornerRadius = UDim.new(0.5, 0),
+    StrokeThickness = 2,
+    Color = ColorSequence.new(
+        Color3.fromHex("8B0000"),
+        Color3.fromHex("000000")
+    ),
+    OnlyMobile = false,
+    Enabled = true,
+    Draggable = true,
 })
 
 -- Serviços
@@ -40,7 +38,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
--- Variáveis de Role (GetPlayerData)
+-- Variáveis de Role
 local roles = {}
 local Murder, Sheriff, Hero
 
@@ -53,11 +51,9 @@ local AutoCoinSpeed = 25
 local StopDuration = 0.25 
 local SelectedTheme = "Crimson"
 local AutoSafeEnabled = false
-local safeTpCount = 0
 local KnifeAuraEnabled = false
 local KnifeAuraDistance = 3
 local SavedPositions = {}
-local AutoCoinHideEnabled = false
 
 local EspEnabled = false
 local GunEspEnabled = false
@@ -95,18 +91,14 @@ FOVCircle.Transparency = 1
 FOVCircle.Filled = false
 FOVCircle.Visible = false
 
--- Tabela para ignorar moedas coletadas
 local Coletadas = {}
-
 LocalPlayer.CharacterAdded:Connect(function()
     Coletadas = {}
 end)
 
 WindUI:SetTheme("Crimson")
 
--- STATS
 local Stats = game:GetService("Stats")
-local HttpService = game:GetService("HttpService")
 
 -- LABELS
 local InfoTab = Window:Tab({Title = "Info", Icon = "house"})
@@ -118,14 +110,13 @@ local FarmTab = Window:Tab({Title = "Farm", Icon = "coins"})
 local PlayerTab = Window:Tab({Title = "Player", Icon = "user"})
 local PerformanceTab = Window:Tab({Title = "Desempenho", Icon = "cpu"})
 
--- ORDEM CORRIGIDA: Role é o primeiro item da aba Info
 local RoleParagraph = InfoTab:Paragraph({Title = "Time", Desc = "Carregando..."})
 local PingParagraph = InfoTab:Paragraph({Title = "Ping", Desc = "0 ms"})
 local FPSParagraph = InfoTab:Paragraph({Title = "FPS", Desc = "0 FPS"})
 local ServerParagraph = InfoTab:Paragraph({Title = "Servidor", Desc = "0/0"})
 
 ---------------------------------------------------------------------------
--- [SISTEMA DE ROLE DETECTOR OTIMIZADO VIA GETPLAYERDATA]
+-- [SISTEMA DE ROLE DETECTOR OTIMIZADO]
 ---------------------------------------------------------------------------
 task.spawn(function()
     while true do
@@ -192,7 +183,6 @@ local function GetPlayerRole(player)
     return "Innocent"
 end
 
--- FPS e Info Loop atualizado
 local FPS = 0
 local Last = tick()
 
@@ -204,7 +194,6 @@ RunService.RenderStepped:Connect(function()
         FPSParagraph:SetDesc(FPS .. " FPS")
         ServerParagraph:SetDesc(#Players:GetPlayers() .. "/" .. Players.MaxPlayers)
         
-        -- Atualiza a role com cores (Inocente = Verde, Xerife = Azul, Murderer = Vermelho)
         local role = GetPlayerRole(LocalPlayer)
         local roleDesc = '<font color="#00FF00">Innocent</font>'
         if role == "Murderer" then
@@ -244,7 +233,6 @@ local function GetPlayerByRole(roleName)
     return nil
 end
 
--- SAFE AREA
 local SafePart = Instance.new("Part")
 SafePart.Name = "SafeArea"
 SafePart.Size = Vector3.new(20,1,20)
@@ -262,7 +250,6 @@ local function TeleportToSafeArea()
     end
 end
 
--- FIND GUN
 local function FindDroppedGun()
     local gun = workspace:FindFirstChild("GunDrop")
     if gun then return gun end
@@ -274,9 +261,6 @@ local function FindDroppedGun()
     return nil
 end
 
----------------------------------------------------------------------------
--- [SISTEMA DE ANTI-FLING INTEGRADO]
----------------------------------------------------------------------------
 RunService.Stepped:Connect(function()
     if AntiFlingEnabled then
         for _, player in ipairs(Players:GetPlayers()) do
@@ -291,9 +275,6 @@ RunService.Stepped:Connect(function()
     end
 end)
 
----------------------------------------------------------------------------
--- [SISTEMA DE AUTO FARM COIN INTEGRADO]
----------------------------------------------------------------------------
 local function GetClosestCoin()
     local char = LocalPlayer.Character
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
@@ -330,13 +311,11 @@ task.spawn(function()
             local hrp = char and char:FindFirstChild("HumanoidRootPart")
             local hum = char and char:FindFirstChildOfClass("Humanoid")
             
-            -- Funciona apenas se estiver participando e vivo
             if hrp and hum and hum.Health > 0 and IsParticipatingAndAlive(LocalPlayer) then
                 local alvo = GetClosestCoin()
                 
                 if alvo and alvo.Parent then
-                    local noclipConnection
-                    noclipConnection = RunService.Stepped:Connect(function()
+                    local noclipConnection = RunService.Stepped:Connect(function()
                         if char then
                             for _, part in ipairs(char:GetChildren()) do
                                 if part:IsA("BasePart") then part.CanCollide = false end
@@ -399,7 +378,7 @@ task.spawn(function()
     end
 end)
 
--- NOCLIP GERAL DA TAB
+-- NOCLIP GERAL
 RunService.Stepped:Connect(function()
     if NoclipEnabled and LocalPlayer.Character then
         for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
@@ -410,7 +389,6 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- AIMBOT TARGETS
 local function GetClosestPlayerToCenter()
     local closestPlayer = nil
     local shortestDistance = FovSize
@@ -445,9 +423,6 @@ local function GetClosestPlayerToCenter()
     return closestPlayer
 end
 
----------------------------------------------------------------------------
--- [NOVO ESP SISTEMA - INTEGRADO COM GETPLAYERDATA E MORTOS VERDES]
----------------------------------------------------------------------------
 local function IsPlayerAlive(player)
     if not player or not player.Character then return false end
     
@@ -499,7 +474,6 @@ local function UpdateESP()
     end
 end
 
--- NOVO FPS BOOSTER
 local function OptimizeTextures()
     Lighting.GlobalShadows = false
     Lighting.FogEnd = 9e9
@@ -537,24 +511,23 @@ workspace.DescendantAdded:Connect(function(descendant)
     end
 end)
 
--- FLY SYSTEM
-local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-local Humanoid = Character:WaitForChild("Humanoid")
-local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
+---------------------------------------------------------------------------
+-- [FLY SYSTEM MELHORADO COM RESPAWN]
+---------------------------------------------------------------------------
+local Character
+local Humanoid
+local HumanoidRootPart
 
-local function SetupCharacter()
-    Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-    Humanoid = Character:WaitForChild("Humanoid")
-    HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
-end
-
-LocalPlayer.CharacterAdded:Connect(SetupCharacter)
-
-local function StartFly()
-    if FlyEnabled then return end
+local function StartFly(isRespawn)
+    if FlyEnabled and not isRespawn then return end
     FlyEnabled = true
 
+    if not Humanoid or not HumanoidRootPart then return end
     Humanoid.PlatformStand = true
+
+    if bodyVelocity and bodyVelocity.Parent then bodyVelocity:Destroy() end
+    if bodyGyro and bodyGyro.Parent then bodyGyro:Destroy() end
+    if flyConnection then flyConnection:Disconnect() end
 
     bodyVelocity = Instance.new("BodyVelocity")
     bodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
@@ -568,6 +541,7 @@ local function StartFly()
     bodyGyro.Parent = HumanoidRootPart
 
     flyConnection = RunService.RenderStepped:Connect(function()
+        if not HumanoidRootPart then return end
         local camCF = Camera.CFrame
         local forward = camCF.LookVector
         local right = camCF.RightVector
@@ -582,22 +556,33 @@ local function StartFly()
             bodyVelocity.Velocity = Vector3.zero
         end
 
-        bodyGyro.CFrame = CFrame.new(
-            HumanoidRootPart.Position,
-            HumanoidRootPart.Position + Camera.CFrame.LookVector
-        )
+        bodyGyro.CFrame = CFrame.new(HumanoidRootPart.Position, HumanoidRootPart.Position + Camera.CFrame.LookVector)
     end)
 end
 
 local function StopFly()
     FlyEnabled = false
-    Humanoid.PlatformStand = false
+    if Humanoid then Humanoid.PlatformStand = false end
     if flyConnection then flyConnection:Disconnect() flyConnection = nil end
     if bodyVelocity then bodyVelocity:Destroy() bodyVelocity = nil end
     if bodyGyro then bodyGyro:Destroy() bodyGyro = nil end
 end
 
--- CONTROLES DO FLY
+-- [CORREÇÃO] Ao nascer, reativa o Fly se ele estiver ligado
+local function SetupCharacter(newChar)
+    Character = newChar
+    Humanoid = newChar:WaitForChild("Humanoid", 5)
+    HumanoidRootPart = newChar:WaitForChild("HumanoidRootPart", 5)
+    
+    if FlyEnabled then
+        task.wait(0.2) -- Espera o personagem e a física carregarem totalmente
+        StartFly(true)
+    end
+end
+LocalPlayer.CharacterAdded:Connect(SetupCharacter)
+-- Executa a primeira vez
+if LocalPlayer.Character then SetupCharacter(LocalPlayer.Character) end
+
 UserInputService.InputBegan:Connect(function(input, gp)
     if gp then return end
     if input.KeyCode == Enum.KeyCode.W then moveVector = Vector3.new(moveVector.X, 0, -1)
@@ -612,8 +597,14 @@ UserInputService.InputEnded:Connect(function(input)
 end)
 
 RunService.RenderStepped:Connect(function()
-    if not Character or not Humanoid then return end
-    local moveDir = Humanoid.MoveDirection
+    local char = LocalPlayer.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if not char or not hum then 
+        moveVector = Vector3.zero
+        return 
+    end
+    
+    local moveDir = hum.MoveDirection
     if moveDir.Magnitude > 0 then
         local relative = Camera.CFrame:VectorToObjectSpace(moveDir)
         moveVector = Vector3.new(relative.X, 0, -relative.Z)
@@ -622,14 +613,19 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
+-- [CORREÇÃO] Pulo Infinito Seguro (checa em tempo real se você tá vivo)
 UserInputService.JumpRequest:Connect(function()
     if InfiniteJump then
-        local hum = Character and Character:FindFirstChild("Humanoid")
-        if hum then hum:ChangeState(Enum.HumanoidStateType.Jumping) end
+        local char = LocalPlayer.Character
+        if char then
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hum and hum:GetState() ~= Enum.HumanoidStateType.Dead then
+                hum:ChangeState(Enum.HumanoidStateType.Jumping)
+            end
+        end
     end
 end)
 
--- FLING MECANISMO
 local function ExecutarMecanismoFling(TargetPlayer)
     if not TargetPlayer then return end
     local char = LocalPlayer.Character
@@ -768,14 +764,12 @@ local function ExecutarMecanismoFling(TargetPlayer)
     end
 end
 
--- LOOP PRINCIPAL DO JOGO (RENDERSTEPPED)
 RunService.RenderStepped:Connect(function()
     local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
     FOVCircle.Position = screenCenter
     FOVCircle.Radius = FovSize
     FOVCircle.Visible = FovVisible
 
-    -- AIM LOCK INSTANTÂNEO
     if AimbotEnabled then
         local target = GetClosestPlayerToCenter()
         if target then
@@ -783,14 +777,18 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-        LocalPlayer.Character.Humanoid.WalkSpeed = Speed
-        LocalPlayer.Character.Humanoid.JumpPower = Jump
+    -- [CORREÇÃO] Velocidade e Pulo forçados em tempo real de forma segura
+    if LocalPlayer.Character then
+        local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        if hum and hum.Health > 0 then
+            hum.WalkSpeed = Speed
+            hum.UseJumpPower = true -- Força o roblox a usar JumpPower ao invés de JumpHeight
+            hum.JumpPower = Jump
+        end
     end
 
     UpdateESP()
 
-    -- ESP GUN (TEXTO "GUN" EM AMARELO)
     local gun = FindDroppedGun()
     if gun and GunEspEnabled then
         local part = gun:IsA("BasePart") and gun or gun:FindFirstChildWhichIsA("BasePart")
@@ -837,7 +835,6 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- KNIFE AURA
     if KnifeAuraEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
         local myHRP = LocalPlayer.Character.HumanoidRootPart
 
@@ -873,17 +870,13 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- AUTO COLLECT GUN DROP
-local AutoCollectGunEnabled = false
 task.spawn(function()
     while true do
-        task.wait(0) -- Mudei para 0.1 para otimizar e não causar lag
-        
+        task.wait(0.1)
         if AutoCollectGunEnabled then
             local char = LocalPlayer.Character
             local currentHRP = char and char:FindFirstChild("HumanoidRootPart")
             
-            -- LÓGICA NOVA: Verifica se a rodada começou e se seu nome está na lista de participantes
             local participandoDaPartida = false
             if roles and next(roles) ~= nil then
                 if roles[LocalPlayer.Name] then
@@ -891,27 +884,17 @@ task.spawn(function()
                 end
             end
             
-            -- Só avança se: Tiver corpo, estiver Vivo, E estiver participando da rodada
             if currentHRP and IsAlive(LocalPlayer) and participandoDaPartida then
                 local minhaRole = GetPlayerRole(LocalPlayer)
-                
-                -- Só tenta pegar a arma se for Inocente
                 if minhaRole == "Innocent" then
                     local gun = FindDroppedGun()
-                    
                     if gun then
                         local part = gun:IsA("BasePart") and gun or gun:FindFirstChildWhichIsA("BasePart")
                         if part then
                             local originalCFrame = currentHRP.CFrame
-                            
-                            -- Teleporta para a arma
                             currentHRP.CFrame = part.CFrame
                             task.wait(0) 
-                            
-                            -- Volta para a posição original
                             currentHRP.CFrame = originalCFrame
-                            
-                            -- Cooldown para não bugar o teleporte
                             task.wait(5)
                         end
                     end
@@ -921,7 +904,6 @@ task.spawn(function()
     end
 end)
 
--- COMBATE ELEMENTOS
 CombatTab:Toggle({Title = "Aimbot", Default = false, Callback = function(v) AimbotEnabled = v end})
 CombatTab:Toggle({Title = "Mostrar FOV", Default = false, Callback = function(v) FovVisible = v end})
 CombatTab:Slider({Title = "FOV", Step = 1, Value = { Min = 50, Max = 500, Default = 100 }, Callback = function(v) FovSize = v end})
@@ -929,7 +911,6 @@ CombatTab:Toggle({Title = "Anti Fling", Default = false, Callback = function(v) 
 CombatTab:Toggle({Title = "Knife Aura", Default = false, Callback = function(v) KnifeAuraEnabled = v end})
 CombatTab:Slider({Title = "Distância Aura", Step = 1, Value = {Min = 0, Max = 10, Default = 3}, Callback = function(v) KnifeAuraDistance = v end})
 
--- FLING ELEMENTOS
 FlingTab:Button({
     Title = "Fling murderer",
     Callback = function()
@@ -1004,11 +985,9 @@ Players.PlayerRemoving:Connect(function(p)
     AtualizarTodasAsListas()
 end)
 
--- ESP ELEMENTOS
 EspTab:Toggle({Title = "ESP Jogadores", Default = false, Callback = function(v) EspEnabled = v end})
 EspTab:Toggle({Title = "ESP Arma", Default = false, Callback = function(v) GunEspEnabled = v end})
 
--- TELEPORTES ELEMENTOS
 TeleportTab:Button({
     Title = "TP Murderer",
     Callback = function()
@@ -1125,7 +1104,6 @@ TeleportTab:Button({
     end
 })
 
--- FARM ELEMENTOS
 FarmTab:Toggle({
     Title = "Auto collect Coin",
     Default = false,
@@ -1156,7 +1134,6 @@ FarmTab:Toggle({
 
 FarmTab:Toggle({Title = "Auto Collect Gun", Default = false, Callback = function(v) AutoCollectGunEnabled = v end})
 
--- PLAYER CONFIGS
 PlayerTab:Input({
     Title = "Velocidade",
     Placeholder = "16",
@@ -1180,7 +1157,6 @@ PlayerTab:Toggle({Title = "NoClip", Default = false, Callback = function(v) Nocl
 PlayerTab:Toggle({Title = "Fly", Default = false, Callback = function(v) if v then StartFly() else StopFly() end end})
 PlayerTab:Slider({Title = "Fly Speed", Step = 5, Value = {Min = 10, Max = 200, Default = 30}, Callback = function(v) FlySpeed = v end})
 
--- DESEMPENHO CONFIGS
 PerformanceTab:Toggle({
     Title = "Modo Leve",
     Default = false,
