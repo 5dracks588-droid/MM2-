@@ -48,7 +48,7 @@ local FovVisible = false
 local FovSize = 100
 local AutoCoinEnabled = false
 local AutoCoinSpeed = 25
-local StopDuration = 0.25 
+local StopDuration = 0
 local SelectedTheme = "Crimson"
 local AutoSafeEnabled = false
 local KnifeAuraEnabled = false
@@ -315,6 +315,16 @@ task.spawn(function()
                 local alvo = GetClosestCoin()
                 
                 if alvo and alvo.Parent then
+                    -- Desativa animações do personagem
+                    local animScript = char:FindFirstChild("Animate")
+                    if animScript then animScript.Disabled = true end
+                    local animator = hum:FindFirstChildOfClass("Animator")
+                    if animator then
+                        for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
+                            track:Stop()
+                        end
+                    end
+
                     local noclipConnection = RunService.Stepped:Connect(function()
                         if char then
                             for _, part in ipairs(char:GetChildren()) do
@@ -349,7 +359,10 @@ task.spawn(function()
                     while AutoCoinEnabled and alvo and alvo.Parent do
                         local atualPos = hrp.Position
                         local distancia = (atualPos - destinoFinal).Magnitude
-                        bg.CFrame = CFrame.new(atualPos, atualPos + Vector3.new(0, 0, -1))
+                        
+                        -- Faz o personagem olhar diretamente para a moeda
+                        bg.CFrame = CFrame.new(atualPos, destinoFinal)
+                        
                         if distancia <= 0.8 then break end
                         
                         local direcao = (destinoFinal - atualPos).Unit
@@ -364,6 +377,9 @@ task.spawn(function()
                     lv:Destroy()
                     attachment:Destroy()
                     bg:Destroy()
+
+                    -- Reativa as animações
+                    if animScript then animScript.Disabled = false end
 
                     if not AutoCoinEnabled then break end
                     Coletadas[alvo] = true
@@ -568,19 +584,17 @@ local function StopFly()
     if bodyGyro then bodyGyro:Destroy() bodyGyro = nil end
 end
 
--- [CORREÇÃO] Ao nascer, reativa o Fly se ele estiver ligado
 local function SetupCharacter(newChar)
     Character = newChar
     Humanoid = newChar:WaitForChild("Humanoid", 5)
     HumanoidRootPart = newChar:WaitForChild("HumanoidRootPart", 5)
     
     if FlyEnabled then
-        task.wait(0.2) -- Espera o personagem e a física carregarem totalmente
+        task.wait(0.2)
         StartFly(true)
     end
 end
 LocalPlayer.CharacterAdded:Connect(SetupCharacter)
--- Executa a primeira vez
 if LocalPlayer.Character then SetupCharacter(LocalPlayer.Character) end
 
 UserInputService.InputBegan:Connect(function(input, gp)
@@ -613,7 +627,6 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- [CORREÇÃO] Pulo Infinito Seguro (checa em tempo real se você tá vivo)
 UserInputService.JumpRequest:Connect(function()
     if InfiniteJump then
         local char = LocalPlayer.Character
@@ -777,12 +790,11 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- [CORREÇÃO] Velocidade e Pulo forçados em tempo real de forma segura
     if LocalPlayer.Character then
         local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
         if hum and hum.Health > 0 then
             hum.WalkSpeed = Speed
-            hum.UseJumpPower = true -- Força o roblox a usar JumpPower ao invés de JumpHeight
+            hum.UseJumpPower = true
             hum.JumpPower = Jump
         end
     end
@@ -1157,7 +1169,7 @@ PlayerTab:Toggle({Title = "NoClip", Default = false, Callback = function(v) Nocl
 PlayerTab:Toggle({Title = "Fly", Default = false, Callback = function(v) if v then StartFly() else StopFly() end end})
 PlayerTab:Slider({Title = "Fly Speed", Step = 5, Value = {Min = 10, Max = 200, Default = 30}, Callback = function(v) FlySpeed = v end})
 
-PerformanceTab:Toggle({
+PerformanceTab:Button({
     Title = "Modo Leve",
     Default = false,
     Callback = function(v)
@@ -1165,3 +1177,4 @@ PerformanceTab:Toggle({
         if v then OptimizeTextures() end
     end
 })
+
