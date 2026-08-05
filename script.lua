@@ -1157,7 +1157,7 @@ PlayerTab:Toggle({Title = "NoClip", Default = false, Callback = function(v) Nocl
 PlayerTab:Toggle({Title = "Fly", Default = false, Callback = function(v) if v then StartFly() else StopFly() end end})
 PlayerTab:Slider({Title = "Fly Speed", Step = 5, Value = {Min = 10, Max = 200, Default = 30}, Callback = function(v) FlySpeed = v end})
 
-PerformanceTab:Button({
+PerformanceTab:Toggle({
     Title = "Modo Leve",
     Default = false,
     Callback = function(v)
