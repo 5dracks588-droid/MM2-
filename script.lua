@@ -34,6 +34,7 @@ local Lighting = game:GetService("Lighting")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local VirtualInputManager = game:GetService("VirtualInputManager")
 
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
@@ -82,6 +83,11 @@ local SelectedPlayerToFling = ""
 local FlingActive = false
 getgenv().OldPos = nil
 getgenv().FPDH = workspace.FallenPartsDestroyHeight
+
+-- VARIÁVEIS DO SILENT AIM / SHOOT BUTTON
+local activeSilentAim = false
+local cachedTargetCFrame = nil 
+local customHoldTrack = nil
 
 -- FOV
 local FOVCircle = Drawing.new("Circle")
@@ -568,19 +574,17 @@ local function StopFly()
     if bodyGyro then bodyGyro:Destroy() bodyGyro = nil end
 end
 
--- [CORREÇÃO] Ao nascer, reativa o Fly se ele estiver ligado
 local function SetupCharacter(newChar)
     Character = newChar
     Humanoid = newChar:WaitForChild("Humanoid", 5)
     HumanoidRootPart = newChar:WaitForChild("HumanoidRootPart", 5)
     
     if FlyEnabled then
-        task.wait(0.2) -- Espera o personagem e a física carregarem totalmente
+        task.wait(0.2)
         StartFly(true)
     end
 end
 LocalPlayer.CharacterAdded:Connect(SetupCharacter)
--- Executa a primeira vez
 if LocalPlayer.Character then SetupCharacter(LocalPlayer.Character) end
 
 UserInputService.InputBegan:Connect(function(input, gp)
@@ -613,7 +617,6 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- [CORREÇÃO] Pulo Infinito Seguro (checa em tempo real se você tá vivo)
 UserInputService.JumpRequest:Connect(function()
     if InfiniteJump then
         local char = LocalPlayer.Character
@@ -777,12 +780,11 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- [CORREÇÃO] Velocidade e Pulo forçados em tempo real de forma segura
     if LocalPlayer.Character then
         local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
         if hum and hum.Health > 0 then
             hum.WalkSpeed = Speed
-            hum.UseJumpPower = true -- Força o roblox a usar JumpPower ao invés de JumpHeight
+            hum.UseJumpPower = true 
             hum.JumpPower = Jump
         end
     end
@@ -870,6 +872,149 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
+-- LOGICA DO SILENT AIM (PREVISÃO 0.2) PARA O BOTÃO DE SHOOT
+local function GetMurderer()
+    for name, data in pairs(roles) do
+        if data.Role == "Murderer" then
+            return Players:FindFirstChild(name)
+        end
+    end
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then
+            local char = p.Character
+            local backpack = p:FindFirstChild("Backpack")
+            if (char and char:FindFirstChild("Knife")) or (backpack and backpack:FindFirstChild("Knife")) then
+                return p
+            end
+        end
+    end
+    return nil
+end
+
+RunService.RenderStepped:Connect(function()
+    local murderer = GetMurderer()
+    local targetPart = nil
+    
+    if murderer and murderer.Character then
+        targetPart = murderer.Character:FindFirstChild("LowerTorso") or murderer.Character:FindFirstChild("Torso") or murderer.Character:FindFirstChild("HumanoidRootPart")
+    end
+    
+    if targetPart and murderer.Character:FindFirstChildOfClass("Humanoid") and murderer.Character:FindFirstChildOfClass("Humanoid").Health > 0 then
+        local targetPos = targetPart.Position
+        local char = targetPart.Parent
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        
+        if hrp then
+            local velocity = hrp.AssemblyLinearVelocity
+            local speed = velocity.Magnitude
+            
+            if speed > 2 and speed < 120 then
+                local timeToHit = math.clamp(speed / 160, 0, 0.2)
+                local predictedPos = targetPos + (velocity * timeToHit)
+                
+                local verticalVelocityY = velocity.Y
+                if math.abs(verticalVelocityY) > 3 then
+                    predictedPos = Vector3.new(predictedPos.X, targetPos.Y + (verticalVelocityY * timeToHit * 0.2), predictedPos.Z)
+                end
+                
+                cachedTargetCFrame = CFrame.new(predictedPos)
+            else
+                cachedTargetCFrame = CFrame.new(targetPos)
+            end
+        else
+            cachedTargetCFrame = CFrame.new(targetPos)
+        end
+    else
+        cachedTargetCFrame = nil
+    end
+end)
+
+local mt = getrawmetatable(game)
+setreadonly(mt, false)
+
+local oldNamecall = mt.__namecall
+local oldIndex = mt.__index
+
+mt.__namecall = newcclosure(function(self, ...)
+    local method = getnamecallmethod()
+    local args = {...}
+    
+    if activeSilentAim and cachedTargetCFrame and not checkcaller() then
+        local targetPos = cachedTargetCFrame.Position
+
+        if method == "Raycast" and typeof(args[1]) == "Vector3" and typeof(args[2]) == "Vector3" then
+            local origin = args[1]
+            args[2] = (targetPos - origin).Unit * 1000
+            return oldNamecall(self, unpack(args))
+        
+        elseif method == "FindPartOnRay" or method == "FindPartOnRayWithIgnoreList" or method == "FindPartOnRayWithWhitelist" then
+            if typeof(args[1]) == "Ray" then
+                local origin = args[1].Origin
+                args[1] = Ray.new(origin, (targetPos - origin).Unit * 1000)
+                return oldNamecall(self, unpack(args))
+            end
+        end
+    end
+    
+    return oldNamecall(self, ...)
+end)
+
+mt.__index = newcclosure(function(t, k)
+    if activeSilentAim and cachedTargetCFrame and not checkcaller() then
+        if k == "Hit" or k == "Target" then
+            if typeof(t) == "Instance" and t:IsA("Mouse") then
+                if k == "Hit" then return cachedTargetCFrame end
+            end
+        end
+    end
+    
+    return oldIndex(t, k)
+end)
+
+setreadonly(mt, true)
+
+-- ANIMAÇÃO DA ARMA
+local function SetupToolAnimation(character)
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    local animator = humanoid and humanoid:FindFirstChildOfClass("Animator")
+    
+    if not animator then return end
+    
+    character.ChildAdded:Connect(function(child)
+        if child:IsA("Tool") and child.Name == "Gun" then
+            for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
+                pcall(function()
+                    track:Stop()
+                end)
+            end
+            
+            local anim = Instance.new("Animation")
+            anim.AnimationId = "rbxassetid://507768375" 
+            
+            pcall(function()
+                customHoldTrack = animator:LoadAnimation(anim)
+                customHoldTrack.Priority = Enum.AnimationPriority.Action
+                customHoldTrack:Play()
+            end)
+        end
+    end)
+    
+    character.ChildRemoved:Connect(function(child)
+        if child:IsA("Tool") and child.Name == "Gun" then
+            if customHoldTrack then
+                customHoldTrack:Stop()
+                customHoldTrack:Destroy()
+                customHoldTrack = nil
+            end
+        end
+    end)
+end
+
+if LocalPlayer.Character then
+    SetupToolAnimation(LocalPlayer.Character)
+end
+LocalPlayer.CharacterAdded:Connect(SetupToolAnimation)
+
 task.spawn(function()
     while true do
         task.wait(0.1)
@@ -910,6 +1055,88 @@ CombatTab:Slider({Title = "FOV", Step = 1, Value = { Min = 50, Max = 500, Defaul
 CombatTab:Toggle({Title = "Anti Fling", Default = false, Callback = function(v) AntiFlingEnabled = v end})
 CombatTab:Toggle({Title = "Knife Aura", Default = false, Callback = function(v) KnifeAuraEnabled = v end})
 CombatTab:Slider({Title = "Distância Aura", Step = 1, Value = {Min = 0, Max = 10, Default = 3}, Callback = function(v) KnifeAuraDistance = v end})
+
+-- FUNÇÃO "ativar botão shoot" COM DEGRADÊ VERMELHO E BRANCO RODANDO NA BORDA
+CombatTab:Toggle({
+    Title = "ativar botão shoot",
+    Default = false,
+    Callback = function(v)
+        local existingGui = LocalPlayer:WaitForChild("PlayerGui"):FindFirstChild("ShootButtonGui")
+        if existingGui then
+            existingGui.Enabled = v
+            return
+        end
+
+        if v then
+            local ScreenGui = Instance.new("ScreenGui")
+            ScreenGui.Name = "ShootButtonGui"
+            ScreenGui.ResetOnSpawn = false
+            ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+            ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+            local ShootButton = Instance.new("TextButton")
+            ShootButton.Name = "ShootButton"
+            ShootButton.Size = UDim2.new(0, 80, 0, 80)
+            ShootButton.Position = UDim2.new(0.75, 0, 0.5, -40)
+            ShootButton.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+            ShootButton.BackgroundTransparency = 0.65
+            ShootButton.Text = "SHOOT"
+            ShootButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+            ShootButton.TextSize = 18
+            ShootButton.Font = Enum.Font.SourceSansBold
+            ShootButton.Active = true
+            ShootButton.Draggable = true
+            ShootButton.Parent = ScreenGui
+
+            local UICorner = Instance.new("UICorner")
+            UICorner.CornerRadius = UDim.new(0, 16)
+            UICorner.Parent = ShootButton
+
+            local UIStroke = Instance.new("UIStroke")
+            UIStroke.Thickness = 3
+            UIStroke.Color = Color3.fromRGB(255, 255, 255) -- CORRIGIDO PARA BRANCO (evita que o degradê fique preto)
+            UIStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+            UIStroke.Parent = ShootButton
+
+            local UIGradient = Instance.new("UIGradient")
+            UIGradient.Color = ColorSequence.new({
+                ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
+                ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 255, 255)),
+                ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0))
+            })
+            UIGradient.Parent = UIStroke
+
+            -- Efeito de rotação contínua do degradê vermelho e branco na borda
+            task.spawn(function()
+                local rotation = 0
+                while ShootButton.Parent do
+                    rotation = (rotation + 3) % 360
+                    UIGradient.Rotation = rotation
+                    task.wait(0.03)
+                end
+            end)
+
+            ShootButton.MouseButton1Down:Connect(function()
+                local Character = LocalPlayer.Character
+                if Character and Character:FindFirstChild("Gun") and cachedTargetCFrame then
+                    activeSilentAim = true
+                    
+                    task.delay(0.15, function()
+                        activeSilentAim = false
+                    end)
+                    
+                    local ScreenSize = Camera.ViewportSize
+                    local CenterX = ScreenSize.X / 2
+                    local CenterY = ScreenSize.Y / 2
+                    
+                    VirtualInputManager:SendTouchEvent(111222, 0, CenterX, CenterY)
+                    task.wait(0)
+                    VirtualInputManager:SendTouchEvent(111222, 2, CenterX, CenterY)
+                end
+            end)
+        end
+    end
+})
 
 FlingTab:Button({
     Title = "Fling murderer",
