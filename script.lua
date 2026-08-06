@@ -1152,7 +1152,7 @@ FarmTab:Toggle({
                         hrp.CFrame = posicaoOriginal
                     end
                 end
-                task.wait(0.2)
+                task.wait()
             end
         end)
     end
@@ -1162,7 +1162,7 @@ FarmTab:Toggle({
 -- [ GET GUN BUTTON (TOGGLE QUE CRIA O BOTÃO REDONDO E MENOR MAIS ACIMA) ]
 ---------------------------------------------------------------------------
 FarmTab:Toggle({
-    Title = "Get Gun Button",
+    Title = "Get gun button",
     Default = false,
     Callback = function(v)
         local existingGetGunGui = LocalPlayer:WaitForChild("PlayerGui"):FindFirstChild("GetGunButtonGui")
