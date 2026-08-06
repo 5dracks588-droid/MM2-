@@ -49,7 +49,7 @@ local FovVisible = false
 local FovSize = 100
 local AutoCoinEnabled = false
 local AutoCoinSpeed = 25
-local StopDuration = 0.05
+local StopDuration = 0.2
 local SelectedTheme = "Crimson"
 local AutoSafeEnabled = false
 local KnifeAuraEnabled = false
@@ -369,15 +369,6 @@ task.spawn(function()
                 local alvo = GetClosestCoin()
                 
                 if alvo and alvo.Parent then
-                    local animScript = char:FindFirstChild("Animate")
-                    if animScript then animScript.Disabled = true end
-                    local animator = hum:FindFirstChildOfClass("Animator")
-                    if animator then
-                        for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
-                            track:Stop()
-                        end
-                    end
-
                     local noclipConnection = RunService.Stepped:Connect(function()
                         if char then
                             for _, part in ipairs(char:GetChildren()) do
@@ -396,10 +387,6 @@ task.spawn(function()
                     lv.RelativeTo = Enum.ActuatorRelativeTo.World
                     lv.Parent = hrp
 
-                    local bg = Instance.new("BodyGyro")
-                    bg.MaxTorque = Vector3.new(1e6, 1e6, 1e6)
-                    bg.D = 100; bg.P = 10000; bg.Parent = hrp
-
                     local spawnDestino = alvo.Position
                     if alvo.Parent:IsA("Model") and alvo.Parent.PrimaryPart then
                         spawnDestino = alvo.Parent.PrimaryPart.Position
@@ -412,8 +399,6 @@ task.spawn(function()
                     while AutoCoinEnabled and alvo and alvo.Parent do
                         local atualPos = hrp.Position
                         local distancia = (atualPos - destinoFinal).Magnitude
-                        
-                        bg.CFrame = CFrame.new(atualPos, destinoFinal)
                         
                         if distancia <= 0.8 then break end
                         
@@ -428,9 +413,6 @@ task.spawn(function()
                     if noclipConnection then noclipConnection:Disconnect() end
                     lv:Destroy()
                     attachment:Destroy()
-                    bg:Destroy()
-
-                    if animScript then animScript.Disabled = false end
 
                     if not AutoCoinEnabled then break end
                     Coletadas[alvo] = true
@@ -892,7 +874,7 @@ CombatTab:Toggle({
                 local ShootButton = Instance.new("TextButton")
                 ShootButton.Name = "ShootButton"
                 ShootButton.Size = UDim2.new(0, 120, 0, 80)
-                ShootButton.Position = UDim2.new(0.75, 0, 0.5, -40)
+                ShootButton.Position = UDim2.new(0.75, 0, 0.5, -38)
                 ShootButton.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
                 ShootButton.BackgroundTransparency = 0.65
                 ShootButton.Text = "SHOOT"
@@ -1079,7 +1061,6 @@ TeleportTab:Button({
     Callback = function()
         local foundSpawn = nil
         
-        -- Varre o workspace procurando por qualquer modelo de mapa ativo (que não seja o Lobby)
         for _, obj in ipairs(workspace:GetChildren()) do
             if obj:IsA("Model") and obj.Name ~= "Lobby" and obj.Name ~= "LobbyWorkspace" and obj.Name ~= "Camera" and obj.Name ~= "Terrain" then
                 local spawns = obj:FindFirstChild("Spawns") or obj:FindFirstChild("PlayerSpawns") or obj:FindFirstChild("SpawnLocations")
@@ -1094,7 +1075,6 @@ TeleportTab:Button({
             end
         end
         
-        -- Fallback para pastas específicas caso existam
         if not foundSpawn then
             local activeMapFolder = workspace:FindFirstChild("NormalMaps") or workspace:FindFirstChild("Map")
             if activeMapFolder then
@@ -1205,13 +1185,13 @@ FarmTab:Toggle({
                 local GetGunButton = Instance.new("TextButton")
                 GetGunButton.Name = "GetGunButton"
                 GetGunButton.Size = UDim2.new(0, 70, 0, 70)
-                GetGunButton.Position = UDim2.new(0.75, 0, 0.3, -35)
+                GetGunButton.Position = UDim2.new(0.80, 0, 0.3, -47)
                 GetGunButton.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
                 GetGunButton.BackgroundTransparency = 0.65
                 GetGunButton.Text = "GET GUN"
                 GetGunButton.TextColor3 = Color3.fromRGB(255, 255, 255)
                 GetGunButton.TextSize = 12
-                GetGunButton.Font = Enum.Font.SourceSansBold
+                GetGunButton.Font = Enum.Font.SourceSans
                 GetGunButton.Active = true
                 GetGunButton.Draggable = true
                 GetGunButton.Parent = ScreenGui
