@@ -876,7 +876,7 @@ CombatTab:Slider({Title = "Distância Aura", Step = 1, Value = {Min = 0, Max = 1
 -- [ TOGGLE AUTO SHOOT COM O BOTÃO FLUTUANTE ]
 ---------------------------------------------------------------------------
 CombatTab:Toggle({
-    Title = "Auto Shoot",
+    Title = "Shoot button",
     Default = false,
     Callback = function(v)
         AutoShootEnabled = v
@@ -1077,17 +1077,45 @@ TeleportTab:Button({
 TeleportTab:Button({
     Title = "TP Arena de Jogo",
     Callback = function()
-        local activeMapFolder = workspace:FindFirstChild("NormalMaps") or workspace:FindFirstChild("Map")
-        if activeMapFolder then
-            for _, mapModel in ipairs(activeMapFolder:GetChildren()) do
-                if mapModel.Name ~= "Lobby" and mapModel.Name ~= "LobbyWorkspace" then
-                    local spawns = mapModel:FindFirstChild("Spawns") or mapModel:FindFirstChild("PlayerSpawns")
-                    if spawns and #spawns:GetChildren() > 0 then
-                        local randomSpawn = spawns:GetChildren()[math.random(1, #spawns:GetChildren())]
-                        if randomSpawn:IsA("BasePart") then TeleportToCFrame(CFrame.new(randomSpawn.Position + Vector3.new(0, 3, 0))); return end
+        local foundSpawn = nil
+        
+        -- Varre o workspace procurando por qualquer modelo de mapa ativo (que não seja o Lobby)
+        for _, obj in ipairs(workspace:GetChildren()) do
+            if obj:IsA("Model") and obj.Name ~= "Lobby" and obj.Name ~= "LobbyWorkspace" and obj.Name ~= "Camera" and obj.Name ~= "Terrain" then
+                local spawns = obj:FindFirstChild("Spawns") or obj:FindFirstChild("PlayerSpawns") or obj:FindFirstChild("SpawnLocations")
+                if spawns and #spawns:GetChildren() > 0 then
+                    local spawnList = spawns:GetChildren()
+                    local randomSpawn = spawnList[math.random(1, #spawnList)]
+                    if randomSpawn:IsA("BasePart") then
+                        foundSpawn = randomSpawn.CFrame
+                        break
                     end
                 end
             end
+        end
+        
+        -- Fallback para pastas específicas caso existam
+        if not foundSpawn then
+            local activeMapFolder = workspace:FindFirstChild("NormalMaps") or workspace:FindFirstChild("Map")
+            if activeMapFolder then
+                for _, mapModel in ipairs(activeMapFolder:GetChildren()) do
+                    if mapModel.Name ~= "Lobby" then
+                        local spawns = mapModel:FindFirstChild("Spawns") or mapModel:FindFirstChild("PlayerSpawns")
+                        if spawns and #spawns:GetChildren() > 0 then
+                            local spawnList = spawns:GetChildren()
+                            local randomSpawn = spawnList[math.random(1, #spawnList)]
+                            if randomSpawn:IsA("BasePart") then
+                                foundSpawn = randomSpawn.CFrame
+                                break
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        
+        if foundSpawn then
+            TeleportToCFrame(foundSpawn + Vector3.new(0, 3, 0))
         end
     end
 })
@@ -1152,17 +1180,17 @@ FarmTab:Toggle({
                         hrp.CFrame = posicaoOriginal
                     end
                 end
-                task.wait()
+                task.wait(0.2)
             end
         end)
     end
 })
 
 ---------------------------------------------------------------------------
--- [ GET GUN BUTTON (TOGGLE QUE CRIA O BOTÃO REDONDO E MENOR MAIS ACIMA) ]
+-- [ GET GUN BUTTON ]
 ---------------------------------------------------------------------------
 FarmTab:Toggle({
-    Title = "Get gun button",
+    Title = "Get Gun Button",
     Default = false,
     Callback = function(v)
         local existingGetGunGui = LocalPlayer:WaitForChild("PlayerGui"):FindFirstChild("GetGunButtonGui")
@@ -1176,8 +1204,8 @@ FarmTab:Toggle({
 
                 local GetGunButton = Instance.new("TextButton")
                 GetGunButton.Name = "GetGunButton"
-                GetGunButton.Size = UDim2.new(0, 70, 0, 70) -- Redondo e menor
-                GetGunButton.Position = UDim2.new(0.75, 0, 0.3, -35) -- Mais acima
+                GetGunButton.Size = UDim2.new(0, 70, 0, 70)
+                GetGunButton.Position = UDim2.new(0.75, 0, 0.3, -35)
                 GetGunButton.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
                 GetGunButton.BackgroundTransparency = 0.65
                 GetGunButton.Text = "GET GUN"
@@ -1189,7 +1217,7 @@ FarmTab:Toggle({
                 GetGunButton.Parent = ScreenGui
 
                 local UICorner = Instance.new("UICorner")
-                UICorner.CornerRadius = UDim.new(1, 0) -- Perfeitamente redondo
+                UICorner.CornerRadius = UDim.new(1, 0)
                 UICorner.Parent = GetGunButton
 
                 local UIStroke = Instance.new("UIStroke")
@@ -1200,7 +1228,7 @@ FarmTab:Toggle({
 
                 local UIGradient = Instance.new("UIGradient")
                 UIGradient.Color = ColorSequence.new({
-                    ColorSequenceKeypoint.new(0, Color3.fromRGB(139, 0, 0)),
+                    ColorSequenceKeypoint.new(0, Color3.fromRGB(139, 0, 255)),
                     ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 255, 255)),
                     ColorSequenceKeypoint.new(1, Color3.fromRGB(139, 0, 0))
                 })
