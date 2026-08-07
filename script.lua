@@ -49,7 +49,7 @@ local FovVisible = false
 local FovSize = 100
 local AutoCoinEnabled = false
 local AutoCoinSpeed = 25
-local StopDuration = 0.2
+local StopDuration = 0.1
 local SelectedTheme = "Crimson"
 local AutoSafeEnabled = false
 local KnifeAuraEnabled = false
@@ -692,32 +692,44 @@ local function ExecutarMecanismoFling(TargetPlayer)
             local TimeToWait = 5
             local Time = tick()
             local Angle = 0
+            local distance = 10
+            local speed = 200
             local progress = 0
             local movingForward = true
-            local flingSpeed = 50
-            local distance = 10
             
             repeat
                 if root and tHum and tRoot then
                     if tRoot.AssemblyLinearVelocity.Magnitude > 150 then break end
                     Angle = (Angle + 45) % 360
                     local dt = task.wait()
-                    local isMoving = tHum.MoveDirection.Magnitude > 0.1 or BasePart.AssemblyLinearVelocity.Magnitude > 2
+                    
+                    local moveDir = tHum.MoveDirection
                     local offsetCFrame = CFrame.new(0, 0, 0)
                     
-                    if isMoving then
-                        if movingForward then
-                            progress = progress + (flingSpeed * dt)
-                            if progress >= distance then progress = distance; movingForward = false end
-                        else
-                            progress = progress - (flingSpeed * dt)
-                            if progress <= 0 then progress = 0; movingForward = true end
-                        end
-                        offsetCFrame = CFrame.new(BasePart.CFrame.LookVector * progress)
+                    if moveDir.Magnitude < 0.1 then
+                        offsetCFrame = CFrame.new(0, 0, 0)
                     else
-                        progress = 0
-                        movingForward = true
+                        local flatDir = Vector3.new(moveDir.X, 0, moveDir.Z).Unit
+                        local localDir = tRoot.CFrame:VectorToObjectSpace(flatDir)
+                        
+                        if movingForward then
+                            progress = progress + (speed * dt)
+                            if progress >= distance then
+                                progress = distance
+                                movingForward = false
+                            end
+                        else
+                            progress = progress - (speed * dt)
+                            if progress <= -distance then
+                                progress = -distance
+                                movingForward = true
+                            end
+                        end
+                        
+                        local sideOffset = math.sin(tick() * 10) * 10
+                        offsetCFrame = CFrame.new(localDir * progress) * CFrame.new(sideOffset, 0, 0)
                     end
+                    
                     FPos(BasePart, offsetCFrame, CFrame.Angles(math.rad(Angle), 0, 0))
                 else
                     break
@@ -809,7 +821,7 @@ RunService.RenderStepped:Connect(function()
                 label.Name = "GunLabel"
                 label.Size = UDim2.new(1, 0, 1, 0)
                 label.BackgroundTransparency = 1
-                label.Text = "Gun"
+                label.Text = "GUN"
                 label.TextColor3 = Color3.fromRGB(255, 255, 0)
                 label.TextSize = 14
                 label.Font = Enum.Font.SourceSansBold
@@ -874,7 +886,7 @@ CombatTab:Toggle({
                 local ShootButton = Instance.new("TextButton")
                 ShootButton.Name = "ShootButton"
                 ShootButton.Size = UDim2.new(0, 120, 0, 80)
-                ShootButton.Position = UDim2.new(0.75, 0, 0.5, -38)
+                ShootButton.Position = UDim2.new(0.75, 0, 0.5, -40)
                 ShootButton.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
                 ShootButton.BackgroundTransparency = 0.65
                 ShootButton.Text = "SHOOT"
@@ -1156,11 +1168,11 @@ FarmTab:Toggle({
                     if part then
                         local posicaoOriginal = hrp.CFrame
                         hrp.CFrame = part.CFrame
-                        task.wait(0.05)
+                        task.wait(0)
                         hrp.CFrame = posicaoOriginal
                     end
                 end
-                task.wait(0.2)
+                task.wait(1)
             end
         end)
     end
@@ -1280,4 +1292,3 @@ PerformanceTab:Toggle({
         if v then OptimizeTextures() end
     end
 })
-
