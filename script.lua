@@ -20,7 +20,7 @@ Window:EditOpenButton({
     StrokeThickness = 2,
     Color = ColorSequence.new(
         Color3.fromHex("8B0000"),
-        Color3.fromHex("000000")
+        Color3.fromHex("FFFFFF")
     ),
     OnlyMobile = false,
     Enabled = true,
@@ -49,7 +49,7 @@ local FovVisible = false
 local FovSize = 100
 local AutoCoinEnabled = false
 local AutoCoinSpeed = 25
-local StopDuration = 0.1
+local StopDuration = 0.15
 local SelectedTheme = "Crimson"
 local AutoSafeEnabled = false
 local KnifeAuraEnabled = false
@@ -60,16 +60,12 @@ local EspEnabled = false
 local GunEspEnabled = false
 local AntiFlingEnabled = false
 local LowGraphicsEnabled = false
-
-local AutoShootEnabled = false
 local AutoCollectGunEnabled = false
 
 local Speed = 16
 local Jump = 50
-
 local InfiniteJump = false
 local NoclipEnabled = false
-
 local FlyEnabled = false
 local FlySpeed = 30 
 
@@ -86,10 +82,6 @@ local SelectedPlayerToFling = ""
 local FlingActive = false
 getgenv().OldPos = nil
 getgenv().FPDH = workspace.FallenPartsDestroyHeight
-
--- VARIÁVEIS DO SILENT AIM / SHOOT
-local activeSilentAim = false
-local cachedTargetCFrame = nil
 
 -- FOV
 local FOVCircle = Drawing.new("Circle")
@@ -156,61 +148,6 @@ local function GetMurderer()
     end
     return nil
 end
-
-task.spawn(function()
-    while true do
-        local murderer = GetMurderer()
-        local targetPart = nil
-        if murderer and murderer.Character then
-            targetPart = murderer.Character:FindFirstChild("LowerTorso") or murderer.Character:FindFirstChild("Torso") or murderer.Character:FindFirstChild("HumanoidRootPart")
-        end
-        if targetPart and murderer.Character:FindFirstChildOfClass("Humanoid") and murderer.Character:FindFirstChildOfClass("Humanoid").Health > 0 then
-            cachedTargetCFrame = CFrame.new(targetPart.Position)
-        else
-            cachedTargetCFrame = nil
-        end
-        task.wait()
-    end
-end)
-
-pcall(function()
-    local mt = getrawmetatable(game)
-    setreadonly(mt, false)
-    local oldNamecall = mt.__namecall
-    local oldIndex = mt.__index
-
-    mt.__namecall = newcclosure(function(self, ...)
-        local method = getnamecallmethod()
-        local args = {...}
-        if activeSilentAim and cachedTargetCFrame and not checkcaller() then
-            local targetPos = cachedTargetCFrame.Position
-            if method == "Raycast" and typeof(args[1]) == "Vector3" and typeof(args[2]) == "Vector3" then
-                local origin = args[1]
-                args[2] = (targetPos - origin).Unit * 1000
-                return oldNamecall(self, unpack(args))
-            elseif method == "FindPartOnRay" or method == "FindPartOnRayWithIgnoreList" or method == "FindPartOnRayWithWhitelist" then
-                if typeof(args[1]) == "Ray" then
-                    local origin = args[1].Origin
-                    args[1] = Ray.new(origin, (targetPos - origin).Unit * 1000)
-                    return oldNamecall(self, unpack(args))
-                end
-            end
-        end
-        return oldNamecall(self, ...)
-    end)
-
-    mt.__index = newcclosure(function(t, k)
-        if activeSilentAim and cachedTargetCFrame and not checkcaller() then
-            if k == "Hit" or k == "Target" then
-                if typeof(t) == "Instance" and t:IsA("Mouse") then
-                    if k == "Hit" then return cachedTargetCFrame end
-                end
-            end
-        end
-        return oldIndex(t, k)
-    end)
-    setreadonly(mt, true)
-end)
 
 local function IsParticipatingAndAlive(player)
     if not roles or not roles[player.Name] then return false end
@@ -329,6 +266,9 @@ RunService.Stepped:Connect(function()
     end
 end)
 
+---------------------------------------------------------------------------
+-- [ AUTO COIN OTIMIZADO ]
+---------------------------------------------------------------------------
 local function GetClosestCoin()
     local char = LocalPlayer.Character
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
@@ -387,24 +327,34 @@ task.spawn(function()
                     lv.RelativeTo = Enum.ActuatorRelativeTo.World
                     lv.Parent = hrp
 
-                    local spawnDestino = alvo.Position
-                    if alvo.Parent:IsA("Model") and alvo.Parent.PrimaryPart then
-                        spawnDestino = alvo.Parent.PrimaryPart.Position
-                    elseif alvo.Name == "Coin_Sub" and alvo.Parent:FindFirstChild("Coin") then
-                        spawnDestino = alvo.Parent.Coin.Position
-                    end
-                    
-                    local destinoFinal = Vector3.new(spawnDestino.X, spawnDestino.Y + 1.2, spawnDestino.Z)
-
                     while AutoCoinEnabled and alvo and alvo.Parent do
+                        -- Verifica a cada frame se apareceu uma moeda mais perto ou se a atual sumiu
+                        local novoAlvo = GetClosestCoin()
+                        if novoAlvo and novoAlvo ~= alvo then
+                            alvo = novoAlvo
+                        end
+                        
+                        if not alvo or not alvo.Parent then break end
+
+                        local spawnDestino = alvo.Position
+                        if alvo.Parent:IsA("Model") and alvo.Parent.PrimaryPart then
+                            spawnDestino = alvo.Parent.PrimaryPart.Position
+                        elseif alvo.Name == "Coin_Sub" and alvo.Parent:FindFirstChild("Coin") then
+                            spawnDestino = alvo.Parent.Coin.Position
+                        end
+                        
+                        local destinoFinal = Vector3.new(spawnDestino.X, spawnDestino.Y + 1.2, spawnDestino.Z)
                         local atualPos = hrp.Position
                         local distancia = (atualPos - destinoFinal).Magnitude
                         
-                        if distancia <= 0.8 then break end
+                        if distancia <= 0.8 then 
+                            Coletadas[alvo] = true
+                            break 
+                        end
                         
                         local direcao = (destinoFinal - atualPos).Unit
                         lv.VectorVelocity = direcao * AutoCoinSpeed
-                        task.wait()
+                        RunService.Heartbeat:Wait() -- Atualiza no instante mais rápido possível
                     end
 
                     lv.VectorVelocity = Vector3.new(0, 0, 0)
@@ -415,13 +365,12 @@ task.spawn(function()
                     attachment:Destroy()
 
                     if not AutoCoinEnabled then break end
-                    Coletadas[alvo] = true
                     task.wait(StopDuration)
                 else
-                    task.wait(0.5)
+                    task.wait(0.1)
                 end
             else
-                task.wait(1)
+                task.wait(0.5)
             end
         end
     end
@@ -516,16 +465,30 @@ local function UpdateESP()
     end
 end
 
+---------------------------------------------------------------------------
+-- [ MODO LEVE OTIMIZADO ]
+---------------------------------------------------------------------------
+local function IsPlayerCharacter(instance)
+    local current = instance
+    while current and current ~= workspace do
+        if current:IsA("Model") and Players:GetPlayerFromCharacter(current) then
+            return true
+        end
+        current = current.Parent
+    end
+    return false
+end
+
 local function OptimizeTextures()
     Lighting.GlobalShadows = false
     Lighting.FogEnd = 9e9
     settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
 
     for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj:IsA("BasePart") then
+        if obj:IsA("BasePart") and not IsPlayerCharacter(obj) then
             obj.Material = Enum.Material.SmoothPlastic
             obj.Reflectance = 0
-        elseif obj:IsA("Texture") or obj:IsA("Decal") then
+        elseif (obj:IsA("Texture") or obj:IsA("Decal")) and not IsPlayerCharacter(obj) then
             obj.Transparency = 1
         end
     end
@@ -538,6 +501,18 @@ local function OptimizeTextures()
     end
     colorCorrection.Saturation = 1
 end
+
+-- Detecção de novas texturas carregando no mapa
+workspace.DescendantAdded:Connect(function(obj)
+    if LowGraphicsEnabled then
+        if obj:IsA("BasePart") and not IsPlayerCharacter(obj) then
+            obj.Material = Enum.Material.SmoothPlastic
+            obj.Reflectance = 0
+        elseif (obj:IsA("Texture") or obj:IsA("Decal")) and not IsPlayerCharacter(obj) then
+            obj.Transparency = 1
+        end
+    end
+end)
 
 -- FLY SYSTEM
 local Character, Humanoid, HumanoidRootPart
@@ -867,87 +842,6 @@ CombatTab:Toggle({Title = "Knife Aura", Default = false, Callback = function(v) 
 CombatTab:Slider({Title = "Distância Aura", Step = 1, Value = {Min = 0, Max = 10, Default = 3}, Callback = function(v) KnifeAuraDistance = v end})
 
 ---------------------------------------------------------------------------
--- [ TOGGLE AUTO SHOOT COM O BOTÃO FLUTUANTE ]
----------------------------------------------------------------------------
-CombatTab:Toggle({
-    Title = "Shoot button",
-    Default = false,
-    Callback = function(v)
-        AutoShootEnabled = v
-        local existingGui = LocalPlayer:WaitForChild("PlayerGui"):FindFirstChild("ShootButtonGui")
-        if AutoShootEnabled then
-            if not existingGui then
-                local ScreenGui = Instance.new("ScreenGui")
-                ScreenGui.Name = "ShootButtonGui"
-                ScreenGui.ResetOnSpawn = false
-                ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-                ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
-
-                local ShootButton = Instance.new("TextButton")
-                ShootButton.Name = "ShootButton"
-                ShootButton.Size = UDim2.new(0, 120, 0, 80)
-                ShootButton.Position = UDim2.new(0.75, 0, 0.5, -40)
-                ShootButton.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-                ShootButton.BackgroundTransparency = 0.65
-                ShootButton.Text = "SHOOT"
-                ShootButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-                ShootButton.TextSize = 18
-                ShootButton.Font = Enum.Font.SourceSans
-                ShootButton.Active = true
-                ShootButton.Draggable = true
-                ShootButton.Parent = ScreenGui
-
-                local UICorner = Instance.new("UICorner")
-                UICorner.CornerRadius = UDim.new(0, 80)
-                UICorner.Parent = ShootButton
-
-                local UIStroke = Instance.new("UIStroke")
-                UIStroke.Thickness = 3
-                UIStroke.Color = Color3.fromRGB(255, 255, 255)
-                UIStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-                UIStroke.Parent = ShootButton
-
-                local UIGradient = Instance.new("UIGradient")
-                UIGradient.Color = ColorSequence.new({
-                    ColorSequenceKeypoint.new(0, Color3.fromRGB(139, 0, 0)),
-                    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 255, 255)),
-                    ColorSequenceKeypoint.new(1, Color3.fromRGB(139, 0, 0))
-                })
-                UIGradient.Parent = UIStroke
-
-                task.spawn(function()
-                    local rot = 0
-                    while ShootButton.Parent and AutoShootEnabled do
-                        rot = (rot + 2) % 360
-                        UIGradient.Rotation = rot
-                        task.wait(0)
-                    end
-                end)
-
-                ShootButton.MouseButton1Down:Connect(function()
-                    local Character = LocalPlayer.Character
-                    if Character and Character:FindFirstChild("Gun") and cachedTargetCFrame then
-                        activeSilentAim = true
-                        task.delay(0.05, function()
-                            activeSilentAim = false
-                        end)
-                        local ScreenSize = Camera.ViewportSize
-                        local CenterX = ScreenSize.X / 2
-                        local CenterY = ScreenSize.Y / 2
-                        VirtualInputManager:SendTouchEvent(111222, 0, CenterX, CenterY)
-                        VirtualInputManager:SendTouchEvent(111222, 2, CenterX, CenterY)
-                    end
-                end)
-            end
-        else
-            if existingGui then
-                existingGui:Destroy()
-            end
-        end
-    end
-})
-
----------------------------------------------------------------------------
 -- [ TAB FLING ]
 ---------------------------------------------------------------------------
 FlingTab:Button({
@@ -1072,7 +966,6 @@ TeleportTab:Button({
     Title = "TP Arena de Jogo",
     Callback = function()
         local foundSpawn = nil
-        
         for _, obj in ipairs(workspace:GetChildren()) do
             if obj:IsA("Model") and obj.Name ~= "Lobby" and obj.Name ~= "LobbyWorkspace" and obj.Name ~= "Camera" and obj.Name ~= "Terrain" then
                 local spawns = obj:FindFirstChild("Spawns") or obj:FindFirstChild("PlayerSpawns") or obj:FindFirstChild("SpawnLocations")
@@ -1086,7 +979,6 @@ TeleportTab:Button({
                 end
             end
         end
-        
         if not foundSpawn then
             local activeMapFolder = workspace:FindFirstChild("NormalMaps") or workspace:FindFirstChild("Map")
             if activeMapFolder then
@@ -1105,10 +997,7 @@ TeleportTab:Button({
                 end
             end
         end
-        
-        if foundSpawn then
-            TeleportToCFrame(foundSpawn + Vector3.new(0, 3, 0))
-        end
+        if foundSpawn then TeleportToCFrame(foundSpawn + Vector3.new(0, 3, 0)) end
     end
 })
 
@@ -1166,95 +1055,15 @@ FarmTab:Toggle({
                 if hrp and gun then
                     local part = gun:IsA("BasePart") and gun or gun:FindFirstChildWhichIsA("BasePart")
                     if part then
-                        local posicaoOriginal = hrp.CFrame
-                        hrp.CFrame = part.CFrame
+                        local posicaoOriginalArma = part.CFrame
+                        part.CFrame = hrp.CFrame
                         task.wait(0)
-                        hrp.CFrame = posicaoOriginal
+                        if part then part.CFrame = posicaoOriginalArma end
                     end
                 end
-                task.wait(1)
+                task.wait(0)
             end
         end)
-    end
-})
-
----------------------------------------------------------------------------
--- [ GET GUN BUTTON ]
----------------------------------------------------------------------------
-FarmTab:Toggle({
-    Title = "Get Gun Button",
-    Default = false,
-    Callback = function(v)
-        local existingGetGunGui = LocalPlayer:WaitForChild("PlayerGui"):FindFirstChild("GetGunButtonGui")
-        if v then
-            if not existingGetGunGui then
-                local ScreenGui = Instance.new("ScreenGui")
-                ScreenGui.Name = "GetGunButtonGui"
-                ScreenGui.ResetOnSpawn = false
-                ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-                ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
-
-                local GetGunButton = Instance.new("TextButton")
-                GetGunButton.Name = "GetGunButton"
-                GetGunButton.Size = UDim2.new(0, 70, 0, 70)
-                GetGunButton.Position = UDim2.new(0.80, 0, 0.3, -47)
-                GetGunButton.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-                GetGunButton.BackgroundTransparency = 0.65
-                GetGunButton.Text = "GET GUN"
-                GetGunButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-                GetGunButton.TextSize = 12
-                GetGunButton.Font = Enum.Font.SourceSans
-                GetGunButton.Active = true
-                GetGunButton.Draggable = true
-                GetGunButton.Parent = ScreenGui
-
-                local UICorner = Instance.new("UICorner")
-                UICorner.CornerRadius = UDim.new(1, 0)
-                UICorner.Parent = GetGunButton
-
-                local UIStroke = Instance.new("UIStroke")
-                UIStroke.Thickness = 3
-                UIStroke.Color = Color3.fromRGB(255, 255, 255)
-                UIStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-                UIStroke.Parent = GetGunButton
-
-                local UIGradient = Instance.new("UIGradient")
-                UIGradient.Color = ColorSequence.new({
-                    ColorSequenceKeypoint.new(0, Color3.fromRGB(139, 0, 0)),
-                    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 255, 255)),
-                    ColorSequenceKeypoint.new(1, Color3.fromRGB(139, 0, 0))
-                })
-                UIGradient.Parent = UIStroke
-
-                task.spawn(function()
-                    local rot = 0
-                    while GetGunButton.Parent and ScreenGui.Parent do
-                        rot = (rot + 2) % 360
-                        UIGradient.Rotation = rot
-                        task.wait(0)
-                    end
-                end)
-
-                GetGunButton.MouseButton1Down:Connect(function()
-                    local char = LocalPlayer.Character
-                    local hrp = char and char:FindFirstChild("HumanoidRootPart")
-                    local gun = FindDroppedGun()
-                    if hrp and gun then
-                        local part = gun:IsA("BasePart") and gun or gun:FindFirstChildWhichIsA("BasePart")
-                        if part then
-                            local posicaoOriginal = hrp.CFrame
-                            hrp.CFrame = part.CFrame
-                            task.wait(0.005)
-                            hrp.CFrame = posicaoOriginal
-                        end
-                    end
-                end)
-            end
-        else
-            if existingGetGunGui then
-                existingGetGunGui:Destroy()
-            end
-        end
     end
 })
 
@@ -1292,3 +1101,4 @@ PerformanceTab:Toggle({
         if v then OptimizeTextures() end
     end
 })
+
