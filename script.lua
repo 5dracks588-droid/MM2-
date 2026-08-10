@@ -4,7 +4,7 @@ local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footag
 local Window = WindUI:CreateWindow({
     Title = "Murder Mystery 2",
     Icon = "crown",
-    Author = "ʀᴇᴅ",
+    Author = "THE RED",
     Folder = "MM2WindUI",
     Size = UDim2.fromOffset(580,430),
     Transparent = true,
@@ -31,26 +31,25 @@ Window:EditOpenButton({
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Lighting = game:GetService("Lighting")
-local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local VirtualInputManager = game:GetService("VirtualInputManager")
+local TweenService = game:GetService("TweenService")
+local Stats = game:GetService("Stats")
 
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
 -- Variáveis de Role
 local roles = {}
-local Murder, Sheriff, Hero
+local Murder, Sheriff
 
 -- Variáveis Gerais
 local AimbotEnabled = false
 local FovVisible = false
 local FovSize = 100
 local AutoCoinEnabled = false
-local AutoCoinSpeed = 25
-local StopDuration = 0.15
-local SelectedTheme = "Crimson"
+local AutoCoinSpeed = 30
+local StopDuration = 0.25
 local AutoSafeEnabled = false
 local KnifeAuraEnabled = false
 local KnifeAuraDistance = 3
@@ -75,7 +74,7 @@ local flyConnection
 local moveVector = Vector3.zero
 
 local SelectedPlayerToTp = ""
-local CurrentTarget = nil
+local PlayerDropdown = nil
 
 -- VARIÁVEIS DO SISTEMA DE FLING
 local SelectedPlayerToFling = ""
@@ -83,13 +82,16 @@ local FlingActive = false
 getgenv().OldPos = nil
 getgenv().FPDH = workspace.FallenPartsDestroyHeight
 
--- FOV
-local FOVCircle = Drawing.new("Circle")
-FOVCircle.Color = Color3.fromRGB(139,0,0)
-FOVCircle.Thickness = 2
-FOVCircle.Transparency = 1
-FOVCircle.Filled = false
-FOVCircle.Visible = false
+-- FOV Seguro
+local FOVCircle = nil
+pcall(function()
+    FOVCircle = Drawing.new("Circle")
+    FOVCircle.Color = Color3.fromRGB(139,0,0)
+    FOVCircle.Thickness = 2
+    FOVCircle.Transparency = 1
+    FOVCircle.Filled = false
+    FOVCircle.Visible = false
+end)
 
 local Coletadas = {}
 LocalPlayer.CharacterAdded:Connect(function()
@@ -97,8 +99,6 @@ LocalPlayer.CharacterAdded:Connect(function()
 end)
 
 WindUI:SetTheme("Crimson")
-
-local Stats = game:GetService("Stats")
 
 -- TABS
 local InfoTab = Window:Tab({Title = "Info", Icon = "house"})
@@ -124,30 +124,48 @@ task.spawn(function()
         if getPlayerData then
             pcall(function()
                 roles = getPlayerData:InvokeServer() or {}
-                Murder, Sheriff, Hero = nil, nil, nil
+                Murder, Sheriff = nil, nil
+                
+                local tempSheriff = nil
+                local sheriffDeadOrKilled = false
+
                 for name, data in pairs(roles) do
                     if data.Role == "Murderer" then
                         Murder = name
                     elseif data.Role == "Sheriff" then
-                        Sheriff = name
+                        tempSheriff = name
+                        if data.Killed or data.Dead then
+                            sheriffDeadOrKilled = true
+                        end
                     elseif data.Role == "Hero" then
-                        Hero = name
+                        -- Se houver Hero cadastrado pelo jogo, vira Sheriff se o original morreu
+                        tempSheriff = name
                     end
                 end
+
+                -- Lógica: Se o Sheriff original morreu/foi eliminado, ele vira Inocente e quem pegar a arma vira Sheriff
+                if sheriffDeadOrKilled then
+                    tempSheriff = nil
+                end
+
+                -- Checa se há alguém com a arma equipada caso o Sheriff tenha morrido
+                if not tempSheriff then
+                    for _, p in ipairs(Players:GetPlayers()) do
+                        if p.Character and (p.Character:FindFirstChild("Gun") or p.Backpack:FindFirstChild("Gun")) then
+                            if p.Name ~= Murder then
+                                tempSheriff = p.Name
+                                break
+                            end
+                        end
+                    end
+                end
+
+                Sheriff = tempSheriff
             end)
         end
         task.wait(0.5)
     end
 end)
-
-local function GetMurderer()
-    for name, data in pairs(roles) do
-        if data.Role == "Murderer" then
-            return Players:FindFirstChild(name)
-        end
-    end
-    return nil
-end
 
 local function IsParticipatingAndAlive(player)
     if not roles or not roles[player.Name] then return false end
@@ -170,7 +188,7 @@ local function GetPlayerRole(player)
         return "Innocent"
     end
     if player.Name == Murder then return "Murderer" end
-    if player.Name == Sheriff or player.Name == Hero then return "Sheriff" end
+    if player.Name == Sheriff then return "Sheriff" end
     return "Innocent"
 end
 
@@ -267,7 +285,7 @@ RunService.Stepped:Connect(function()
 end)
 
 ---------------------------------------------------------------------------
--- [ AUTO COIN OTIMIZADO ]
+-- [ AUTO COIN COM TWEEN SPEED E PARADA SE NENHUMA MOEDA FOR ENCONTRADA ]
 ---------------------------------------------------------------------------
 local function GetClosestCoin()
     local char = LocalPlayer.Character
@@ -277,7 +295,9 @@ local function GetClosestCoin()
     local menorDistancia = math.huge
     local moedaAlvo = nil
 
-    for _, obj in ipairs(workspace:GetDescendants()) do
+    local areaDeBusca = workspace:FindFirstChild("NormalMaps") or workspace:FindFirstChild("Map") or workspace
+
+    for _, obj in ipairs(areaDeBusca:GetDescendants()) do
         if obj:IsA("BasePart") and obj.Parent and not Coletadas[obj] and obj.Transparency < 1 and obj.CanCollide == false then
             local nome = string.lower(obj.Name)
             if nome:find("coin") or nome:find("gold") or nome:find("token") then
@@ -297,6 +317,8 @@ local function GetClosestCoin()
     return moedaAlvo
 end
 
+local currentCoinTween = nil
+
 task.spawn(function()
     while true do
         task.wait(0.1)
@@ -308,7 +330,7 @@ task.spawn(function()
             if hrp and hum and hum.Health > 0 and IsParticipatingAndAlive(LocalPlayer) then
                 local alvo = GetClosestCoin()
                 
-                if alvo and alvo.Parent then
+                if alvo then
                     local noclipConnection = RunService.Stepped:Connect(function()
                         if char then
                             for _, part in ipairs(char:GetChildren()) do
@@ -317,29 +339,28 @@ task.spawn(function()
                         end
                     end)
                     
-                    local attachment = Instance.new("Attachment")
-                    attachment.Parent = hrp
-                    
-                    local lv = Instance.new("LinearVelocity")
-                    lv.MaxForce = 1e6
-                    lv.VectorVelocity = Vector3.new(0, 0, 0)
-                    lv.Attachment0 = attachment
-                    lv.RelativeTo = Enum.ActuatorRelativeTo.World
-                    lv.Parent = hrp
+                    local bv = Instance.new("BodyVelocity")
+                    bv.MaxForce = Vector3.new(1e6, 1e6, 1e6)
+                    bv.Velocity = Vector3.zero
+                    bv.Parent = hrp
 
-                    while AutoCoinEnabled and alvo and alvo.Parent do
-                        -- Verifica a cada frame se apareceu uma moeda mais perto ou se a atual sumiu
-                        local novoAlvo = GetClosestCoin()
-                        if novoAlvo and novoAlvo ~= alvo then
-                            alvo = novoAlvo
+                    local ultimoScan = 0
+
+                    while AutoCoinEnabled do
+                        if not alvo or not alvo.Parent or Coletadas[alvo] or (tick() - ultimoScan > 0.5) then
+                            alvo = GetClosestCoin()
+                            ultimoScan = tick()
                         end
                         
-                        if not alvo or not alvo.Parent then break end
+                        -- Se não perceber nenhuma moeda no mapa, a função para até encontrar moeda de novo
+                        if not alvo then 
+                            break 
+                        end
 
                         local spawnDestino = alvo.Position
-                        if alvo.Parent:IsA("Model") and alvo.Parent.PrimaryPart then
+                        if alvo.Parent and alvo.Parent:IsA("Model") and alvo.Parent.PrimaryPart then
                             spawnDestino = alvo.Parent.PrimaryPart.Position
-                        elseif alvo.Name == "Coin_Sub" and alvo.Parent:FindFirstChild("Coin") then
+                        elseif alvo.Name == "Coin_Sub" and alvo.Parent and alvo.Parent:FindFirstChild("Coin") then
                             spawnDestino = alvo.Parent.Coin.Position
                         end
                         
@@ -348,26 +369,51 @@ task.spawn(function()
                         local distancia = (atualPos - destinoFinal).Magnitude
                         
                         if distancia <= 0.8 then 
+                            if currentCoinTween then
+                                currentCoinTween:Cancel()
+                                currentCoinTween = nil
+                            end
+                            hrp.AssemblyLinearVelocity = Vector3.zero
+                            
                             Coletadas[alvo] = true
-                            break 
+                            alvo = nil 
+                            
+                            task.wait(0.2)
+                        else
+                            local tempoViagem = math.max(0.05, distancia / AutoCoinSpeed)
+                            
+                            if currentCoinTween then
+                                currentCoinTween:Cancel()
+                            end
+                            
+                            local tweenInfo = TweenInfo.new(tempoViagem, Enum.EasingStyle.Linear)
+                            currentCoinTween = TweenService:Create(hrp, tweenInfo, {CFrame = CFrame.new(destinoFinal)})
+                            currentCoinTween:Play()
+                            
+                            local tempoEsperado = tick() + tempoViagem
+                            while AutoCoinEnabled and currentCoinTween and currentCoinTween.PlaybackState == Enum.PlaybackState.Playing and tick() < tempoEsperado do
+                                RunService.Heartbeat:Wait()
+                                if not alvo or not alvo.Parent or Coletadas[alvo] then break end
+                            end
                         end
                         
-                        local direcao = (destinoFinal - atualPos).Unit
-                        lv.VectorVelocity = direcao * AutoCoinSpeed
-                        RunService.Heartbeat:Wait() -- Atualiza no instante mais rápido possível
+                        RunService.Heartbeat:Wait()
                     end
 
-                    lv.VectorVelocity = Vector3.new(0, 0, 0)
-                    hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                    if currentCoinTween then
+                        currentCoinTween:Cancel()
+                        currentCoinTween = nil
+                    end
+                    hrp.AssemblyLinearVelocity = Vector3.zero
 
                     if noclipConnection then noclipConnection:Disconnect() end
-                    lv:Destroy()
-                    attachment:Destroy()
+                    if bv then bv:Destroy() end
 
                     if not AutoCoinEnabled then break end
                     task.wait(StopDuration)
                 else
-                    task.wait(0.1)
+                    -- Aguarda e checa novamente se há moedas disponíveis
+                    task.wait(1)
                 end
             else
                 task.wait(0.5)
@@ -466,7 +512,7 @@ local function UpdateESP()
 end
 
 ---------------------------------------------------------------------------
--- [ MODO LEVE OTIMIZADO ]
+-- [ MODO LEVE ]
 ---------------------------------------------------------------------------
 local function IsPlayerCharacter(instance)
     local current = instance
@@ -502,7 +548,6 @@ local function OptimizeTextures()
     colorCorrection.Saturation = 1
 end
 
--- Detecção de novas texturas carregando no mapa
 workspace.DescendantAdded:Connect(function(obj)
     if LowGraphicsEnabled then
         if obj:IsA("BasePart") and not IsPlayerCharacter(obj) then
@@ -746,10 +791,12 @@ local function ExecutarMecanismoFling(TargetPlayer)
 end
 
 RunService.RenderStepped:Connect(function()
-    local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-    FOVCircle.Position = screenCenter
-    FOVCircle.Radius = FovSize
-    FOVCircle.Visible = FovVisible
+    if FOVCircle then
+        local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+        FOVCircle.Position = screenCenter
+        FOVCircle.Radius = FovSize
+        FOVCircle.Visible = FovVisible
+    end
 
     if AimbotEnabled then
         local target = GetClosestPlayerToCenter()
@@ -832,7 +879,7 @@ RunService.RenderStepped:Connect(function()
 end)
 
 ---------------------------------------------------------------------------
--- [ TAB COMBATE ]
+-- [ TABS E INTERFACES ]
 ---------------------------------------------------------------------------
 CombatTab:Toggle({Title = "Aimbot", Default = false, Callback = function(v) AimbotEnabled = v end})
 CombatTab:Toggle({Title = "Mostrar FOV", Default = false, Callback = function(v) FovVisible = v end})
@@ -841,9 +888,6 @@ CombatTab:Toggle({Title = "Anti Fling", Default = false, Callback = function(v) 
 CombatTab:Toggle({Title = "Knife Aura", Default = false, Callback = function(v) KnifeAuraEnabled = v end})
 CombatTab:Slider({Title = "Distância Aura", Step = 1, Value = {Min = 0, Max = 10, Default = 3}, Callback = function(v) KnifeAuraDistance = v end})
 
----------------------------------------------------------------------------
--- [ TAB FLING ]
----------------------------------------------------------------------------
 FlingTab:Button({
     Title = "Fling murderer",
     Callback = function()
@@ -906,9 +950,6 @@ end)
 EspTab:Toggle({Title = "ESP Jogadores", Default = false, Callback = function(v) EspEnabled = v end})
 EspTab:Toggle({Title = "ESP Arma", Default = false, Callback = function(v) GunEspEnabled = v end})
 
----------------------------------------------------------------------------
--- [ TAB TELEPORTE ]
----------------------------------------------------------------------------
 TeleportTab:Button({
     Title = "TP Murderer",
     Callback = function()
@@ -1012,15 +1053,18 @@ TeleportTab:Button({
     end
 })
 
----------------------------------------------------------------------------
--- [ TAB FARM ]
----------------------------------------------------------------------------
 FarmTab:Toggle({
     Title = "Auto collect Coin",
     Default = false,
     Callback = function(v)
         AutoCoinEnabled = v
-        if not v then Coletadas = {} end
+        if not v then
+            if currentCoinTween then
+                currentCoinTween:Cancel()
+                currentCoinTween = nil
+            end
+            Coletadas = {} 
+        end
     end
 })
 
@@ -1048,28 +1092,31 @@ FarmTab:Toggle({
         AutoCollectGunEnabled = v
         task.spawn(function()
             while AutoCollectGunEnabled do
-                local char = LocalPlayer.Character
-                local hrp = char and char:FindFirstChild("HumanoidRootPart")
-                local gun = FindDroppedGun()
+                -- Só funciona se eu for inocente, estiver participando da partida e não tiver morrido nela
+                local myRole = GetPlayerRole(LocalPlayer)
+                local isAliveAndParticipating = IsParticipatingAndAlive(LocalPlayer)
                 
-                if hrp and gun then
-                    local part = gun:IsA("BasePart") and gun or gun:FindFirstChildWhichIsA("BasePart")
-                    if part then
-                        local posicaoOriginalArma = part.CFrame
-                        part.CFrame = hrp.CFrame
-                        task.wait(0)
-                        if part then part.CFrame = posicaoOriginalArma end
+                if myRole == "Innocent" and isAliveAndParticipating then
+                    local char = LocalPlayer.Character
+                    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                    local gun = FindDroppedGun()
+                    
+                    if hrp and gun then
+                        local part = gun:IsA("BasePart") and gun or gun:FindFirstChildWhichIsA("BasePart")
+                        if part then
+                            local posicaoOriginalArma = part.CFrame
+                            part.CFrame = hrp.CFrame
+                            task.wait()
+                            if part then part.CFrame = posicaoOriginalArma end
+                        end
                     end
                 end
-                task.wait(0)
+                task.wait()
             end
         end)
     end
 })
 
----------------------------------------------------------------------------
--- [ OUTRAS TABS ]
----------------------------------------------------------------------------
 PlayerTab:Input({
     Title = "Velocidade",
     Placeholder = "16",
