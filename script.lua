@@ -56,6 +56,7 @@ local KnifeAuraDistance = 3
 local SavedPositions = {}
 
 local EspEnabled = false
+local EspMyPlayerEnabled = false -- NOVO: ESP no jogador
 local GunEspEnabled = false
 local AntiFlingEnabled = false
 local LowGraphicsEnabled = false
@@ -86,8 +87,9 @@ getgenv().FPDH = workspace.FallenPartsDestroyHeight
 local FOVCircle = nil
 pcall(function()
     FOVCircle = Drawing.new("Circle")
+    FOVCircle.NumSides = 100 -- Adicione esta linha para ficar 100% redondo
     FOVCircle.Color = Color3.fromRGB(139,0,0)
-    FOVCircle.Thickness = 2
+    FOVCircle.Thickness = 6 
     FOVCircle.Transparency = 1
     FOVCircle.Filled = false
     FOVCircle.Visible = false
@@ -138,17 +140,14 @@ task.spawn(function()
                             sheriffDeadOrKilled = true
                         end
                     elseif data.Role == "Hero" then
-                        -- Se houver Hero cadastrado pelo jogo, vira Sheriff se o original morreu
                         tempSheriff = name
                     end
                 end
 
-                -- Lógica: Se o Sheriff original morreu/foi eliminado, ele vira Inocente e quem pegar a arma vira Sheriff
                 if sheriffDeadOrKilled then
                     tempSheriff = nil
                 end
 
-                -- Checa se há alguém com a arma equipada caso o Sheriff tenha morrido
                 if not tempSheriff then
                     for _, p in ipairs(Players:GetPlayers()) do
                         if p.Character and (p.Character:FindFirstChild("Gun") or p.Backpack:FindFirstChild("Gun")) then
@@ -352,7 +351,6 @@ task.spawn(function()
                             ultimoScan = tick()
                         end
                         
-                        -- Se não perceber nenhuma moeda no mapa, a função para até encontrar moeda de novo
                         if not alvo then 
                             break 
                         end
@@ -412,7 +410,6 @@ task.spawn(function()
                     if not AutoCoinEnabled then break end
                     task.wait(StopDuration)
                 else
-                    -- Aguarda e checa novamente se há moedas disponíveis
                     task.wait(1)
                 end
             else
@@ -479,7 +476,8 @@ end
 
 local function UpdateESP()
     for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer and p.Character then
+        -- MODIFICADO: Condição para incluir LocalPlayer se EspMyPlayerEnabled estiver true
+        if (p ~= LocalPlayer or EspMyPlayerEnabled) and p.Character then
             local char = p.Character
             local highlight = char:FindFirstChild("ESPHighlight")
 
@@ -507,6 +505,10 @@ local function UpdateESP()
             else
                 if highlight then highlight:Destroy() end
             end
+        elseif p == LocalPlayer and not EspMyPlayerEnabled then
+            -- Remove highlight se o ESP My Player for desligado
+            local highlight = p.Character:FindFirstChild("ESPHighlight")
+            if highlight then highlight:Destroy() end
         end
     end
 end
@@ -794,7 +796,7 @@ RunService.RenderStepped:Connect(function()
     if FOVCircle then
         local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
         FOVCircle.Position = screenCenter
-        FOVCircle.Radius = FovSize
+        FOVCircle.Radius = FovSize * 2.5-- MODIFICADO: 2.5x maior
         FOVCircle.Visible = FovVisible
     end
 
@@ -948,6 +950,7 @@ Players.PlayerRemoving:Connect(function(p)
 end)
 
 EspTab:Toggle({Title = "ESP Jogadores", Default = false, Callback = function(v) EspEnabled = v end})
+EspTab:Toggle({Title = "ESP My Player", Default = false, Callback = function(v) EspMyPlayerEnabled = v end}) -- NOVO: Toggle ESP My Player
 EspTab:Toggle({Title = "ESP Arma", Default = false, Callback = function(v) GunEspEnabled = v end})
 
 TeleportTab:Button({
@@ -1092,7 +1095,6 @@ FarmTab:Toggle({
         AutoCollectGunEnabled = v
         task.spawn(function()
             while AutoCollectGunEnabled do
-                -- Só funciona se eu for inocente, estiver participando da partida e não tiver morrido nela
                 local myRole = GetPlayerRole(LocalPlayer)
                 local isAliveAndParticipating = IsParticipatingAndAlive(LocalPlayer)
                 
@@ -1148,4 +1150,3 @@ PerformanceTab:Toggle({
         if v then OptimizeTextures() end
     end
 })
-
