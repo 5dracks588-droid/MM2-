@@ -1066,7 +1066,7 @@ RunService.RenderStepped:Connect(function()
                 label.Name = "GunLabel"
                 label.Size = UDim2.new(1, 0, 1, 0)
                 label.BackgroundTransparency = 1
-                label.Text = "GUN"
+                label.Text = "GUN DROPED"
                 label.TextColor3 = Color3.fromRGB(255, 255, 0)
                 label.TextSize = 14
                 label.Font = Enum.Font.SourceSansBold
