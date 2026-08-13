@@ -117,7 +117,7 @@ local FOVCircle = nil
 pcall(function()
     FOVCircle = Drawing.new("Circle")
     FOVCircle.NumSides = 100
-    FOVCircle.Color = Color3.fromRGB(139,0,0)
+    FOVCircle.Color = Color3.fromRGB(0,0,0)
     FOVCircle.Thickness = 6 
     FOVCircle.Transparency = 1
     FOVCircle.Filled = false
