@@ -20,7 +20,7 @@ Window:EditOpenButton({
     StrokeThickness = 2,
     Color = ColorSequence.new(
         Color3.fromHex("8B0000"),
-        Color3.fromHex("FFFFFF")
+        Color3.fromHex("8B0000")
     ),
     OnlyMobile = false,
     Enabled = true,
