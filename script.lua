@@ -4,14 +4,38 @@ local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footag
 local Window = WindUI:CreateWindow({
     Title = "Murder Mystery 2",
     Icon = "crown",
-    Author = "THE RED",
+    Author = "RED",
     Folder = "MM2WindUI",
     Size = UDim2.fromOffset(580,430),
     Transparent = true,
-    Theme = "Crimson",
+    Theme = "Dark",
     SideBarWidth = 200,
     MinimizeKey = Enum.KeyCode.RightControl
 })
+
+-- APLICAÇÃO DO WALLPAPER DENTRO DO MENU
+pcall(function()
+    local mainFrame = Window.UIElements and Window.UIElements.Main or Window.Frame or Window.Container
+    
+    if not mainFrame and Window.Root then
+        mainFrame = Window.Root:FindFirstChildOfClass("Frame")
+    end
+    
+    if mainFrame then
+        mainFrame.BackgroundTransparency = 0.4
+        
+        local bgImage = Instance.new("ImageLabel")
+        bgImage.Name = "MenuWallpaper"
+        bgImage.Size = UDim2.fromScale(1, 1)
+        bgImage.Position = UDim2.fromScale(0, 0)
+        bgImage.Image = "rbxassetid://140088303441183" -- Cole o ID da sua imagem aqui
+        bgImage.BackgroundTransparency = 1
+        bgImage.ImageTransparency = 0.2 -- Transparência da imagem (0 a 1)
+        bgImage.ScaleType = Enum.ScaleType.Crop
+        bgImage.ZIndex = 1
+        bgImage.Parent = mainFrame
+    end
+end)
 
 Window:EditOpenButton({
     Title = "Open Menu",
@@ -19,8 +43,8 @@ Window:EditOpenButton({
     CornerRadius = UDim.new(0.5, 0),
     StrokeThickness = 2,
     Color = ColorSequence.new(
-        Color3.fromHex("8B0000"),
-        Color3.fromHex("8B0000")
+        Color3.fromHex("000000"),
+        Color3.fromHex("000000")
     ),
     OnlyMobile = false,
     Enabled = true,
@@ -105,7 +129,7 @@ LocalPlayer.CharacterAdded:Connect(function()
     Coletadas = {}
 end)
 
-WindUI:SetTheme("Crimson")
+WindUI:SetTheme("Dark")
 
 -- TABS
 local InfoTab = Window:Tab({Title = "Info", Icon = "house"})
