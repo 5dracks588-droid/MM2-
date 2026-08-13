@@ -35,6 +35,7 @@ local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 local Stats = game:GetService("Stats")
+local VirtualInputManager = game:GetService("VirtualInputManager")
 
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
@@ -48,15 +49,14 @@ local AimbotEnabled = false
 local FovVisible = false
 local FovSize = 100
 local AutoCoinEnabled = false
-local AutoCoinSpeed = 30
-local StopDuration = 0.25
+local AutoCoinSpeed = 25
 local AutoSafeEnabled = false
 local KnifeAuraEnabled = false
 local KnifeAuraDistance = 3
 local SavedPositions = {}
 
 local EspEnabled = false
-local EspMyPlayerEnabled = false -- NOVO: ESP no jogador
+local EspMyPlayerEnabled = false
 local GunEspEnabled = false
 local AntiFlingEnabled = false
 local LowGraphicsEnabled = false
@@ -83,11 +83,16 @@ local FlingActive = false
 getgenv().OldPos = nil
 getgenv().FPDH = workspace.FallenPartsDestroyHeight
 
+-- VARIÁVEIS DO SHOOT BUTTON / SILENT AIM
+local activeSilentAim = false
+local cachedTargetCFrame = nil
+local ShootButtonGui = nil
+
 -- FOV Seguro
 local FOVCircle = nil
 pcall(function()
     FOVCircle = Drawing.new("Circle")
-    FOVCircle.NumSides = 100 -- Adicione esta linha para ficar 100% redondo
+    FOVCircle.NumSides = 100
     FOVCircle.Color = Color3.fromRGB(139,0,0)
     FOVCircle.Thickness = 6 
     FOVCircle.Transparency = 1
@@ -191,6 +196,185 @@ local function GetPlayerRole(player)
     return "Innocent"
 end
 
+local function GetMurdererPlayer()
+    if Murder then
+        return Players:FindFirstChild(Murder)
+    end
+    return nil
+end
+
+---------------------------------------------------------------------------
+-- [ PREDIÇÃO 3D AVANÇADA PARA O SHOOT BUTTON ]
+---------------------------------------------------------------------------
+local function GetPredictedCFrame(targetChar)
+    if not targetChar then return nil end
+    
+    local targetPart = targetChar:FindFirstChild("HumanoidRootPart") or targetChar:FindFirstChild("LowerTorso") or targetChar:FindFirstChild("Torso")
+    local humanoid = targetChar:FindFirstChildOfClass("Humanoid")
+    
+    if not targetPart or not humanoid then return nil end
+
+    local pos = targetPart.Position
+    local moveDir = humanoid.MoveDirection
+    local vel = targetPart.AssemblyLinearVelocity
+
+    local currentPing = 80
+    pcall(function()
+        currentPing = Stats.Network.ServerStatsItem["Data Ping"]:GetValue()
+    end)
+
+    local pingInSeconds = currentPing / 1000
+    local totalLatency = pingInSeconds + 0.05
+
+    local predictedVelocity = vel
+    if moveDir.Magnitude > 0 then
+        local horizSpeed = Vector3.new(vel.X, 0, vel.Z).Magnitude
+        if horizSpeed < 1 then horizSpeed = humanoid.WalkSpeed end
+        local horizVel = moveDir * horizSpeed
+        predictedVelocity = Vector3.new(horizVel.X, vel.Y, horizVel.Z)
+    end
+
+    local finalPos = pos + (predictedVelocity * totalLatency)
+    
+    local state = humanoid:GetState()
+    if state == Enum.HumanoidStateType.Jumping or state == Enum.HumanoidStateType.Freefall then
+        finalPos = finalPos + Vector3.new(0, vel.Y * 0.08, 0)
+    end
+
+    return CFrame.new(finalPos)
+end
+
+task.spawn(function()
+    while true do
+        local murderer = GetMurdererPlayer()
+        if murderer and murderer.Character and murderer.Character:FindFirstChildOfClass("Humanoid") and murderer.Character:FindFirstChildOfClass("Humanoid").Health > 0 then
+            cachedTargetCFrame = GetPredictedCFrame(murderer.Character)
+        else
+            cachedTargetCFrame = nil
+        end
+        task.wait()
+    end
+end)
+
+---------------------------------------------------------------------------
+-- [ SILENT AIM (METATABLE HOOK) ]
+---------------------------------------------------------------------------
+pcall(function()
+    local mt = getrawmetatable(game)
+    setreadonly(mt, false)
+    local oldNamecall = mt.__namecall
+    local oldIndex = mt.__index
+
+    mt.__namecall = newcclosure(function(self, ...)
+        local method = getnamecallmethod()
+        local args = {...}
+        if activeSilentAim and cachedTargetCFrame and not checkcaller() then
+            local targetPos = cachedTargetCFrame.Position
+            if method == "Raycast" and typeof(args[1]) == "Vector3" and typeof(args[2]) == "Vector3" then
+                local origin = args[1]
+                args[2] = (targetPos - origin).Unit * 1000
+                return oldNamecall(self, unpack(args))
+            elseif method == "FindPartOnRay" or method == "FindPartOnRayWithIgnoreList" or method == "FindPartOnRayWithWhitelist" then
+                if typeof(args[1]) == "Ray" then
+                    local origin = args[1].Origin
+                    args[1] = Ray.new(origin, (targetPos - origin).Unit * 1000)
+                    return oldNamecall(self, unpack(args))
+                end
+            end
+        end
+        return oldNamecall(self, ...)
+    end)
+
+    mt.__index = newcclosure(function(t, k)
+        if activeSilentAim and cachedTargetCFrame and not checkcaller() then
+            if k == "Hit" or k == "Target" then
+                if typeof(t) == "Instance" and t:IsA("Mouse") then
+                    if k == "Hit" then return cachedTargetCFrame end
+                end
+            end
+        end
+        return oldIndex(t, k)
+    end)
+    setreadonly(mt, true)
+end)
+
+---------------------------------------------------------------------------
+-- [ CRIANDO / DESTRUINDO O BOTÃO SHOOT ]
+---------------------------------------------------------------------------
+local function ToggleShootButtonGui(enable)
+    if enable then
+        if ShootButtonGui then ShootButtonGui:Destroy() end
+
+        local ScreenGui = Instance.new("ScreenGui")
+        ScreenGui.Name = "ShootButtonGui"
+        ScreenGui.ResetOnSpawn = false
+        ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+        ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+        local ShootButton = Instance.new("TextButton")
+        ShootButton.Name = "ShootButton"
+        ShootButton.Size = UDim2.new(0, 150, 0, 70)
+        ShootButton.Position = UDim2.new(0.75, 0, 0.5, -40)
+        ShootButton.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+        ShootButton.BackgroundTransparency = 0.5
+        ShootButton.Text = "SHOOT"
+        ShootButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+        ShootButton.TextSize = 18
+        ShootButton.Font = Enum.Font.SourceSans
+        ShootButton.Active = true
+        ShootButton.Draggable = false
+        ShootButton.Parent = ScreenGui
+
+        local UICorner = Instance.new("UICorner")
+        UICorner.CornerRadius = UDim.new(0, 5)
+        UICorner.Parent = ShootButton
+
+        local UIStroke = Instance.new("UIStroke")
+        UIStroke.Thickness = 3
+        UIStroke.Color = Color3.fromRGB(0, 0, 0)
+        UIStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+        UIStroke.Parent = ShootButton
+
+        ShootButton.MouseButton1Down:Connect(function()
+            local Character = LocalPlayer.Character
+            local Backpack = LocalPlayer:FindFirstChild("Backpack")
+            
+            if Character and Backpack and cachedTargetCFrame then
+                local gunInBackpack = Backpack:FindFirstChild("Gun")
+                local gunInChar = Character:FindFirstChild("Gun")
+                
+                if gunInBackpack and not gunInChar then
+                    gunInBackpack.Parent = Character
+                end
+
+                activeSilentAim = true
+                
+                local ScreenSize = Camera.ViewportSize
+                local CenterX = ScreenSize.X / 2
+                local CenterY = ScreenSize.Y / 2
+                
+                VirtualInputManager:SendTouchEvent(111222, 0, CenterX, CenterY)
+                VirtualInputManager:SendTouchEvent(111222, 2, CenterX, CenterY)
+                
+                task.delay(0.05, function()
+                    activeSilentAim = false
+                    local currentGun = Character:FindFirstChild("Gun")
+                    if currentGun then
+                        currentGun.Parent = Backpack
+                    end
+                end)
+            end
+        end)
+
+        ShootButtonGui = ScreenGui
+    else
+        if ShootButtonGui then
+            ShootButtonGui:Destroy()
+            ShootButtonGui = nil
+        end
+    end
+end
+
 local FPS = 0
 local Last = tick()
 
@@ -284,8 +468,16 @@ RunService.Stepped:Connect(function()
 end)
 
 ---------------------------------------------------------------------------
--- [ AUTO COIN COM TWEEN SPEED E PARADA SE NENHUMA MOEDA FOR ENCONTRADA ]
+-- [ AUTO COIN COM CONFIGURAÇÕES DE TEMPO DE CHECAGEM E PERMANÊNCIA ]
 ---------------------------------------------------------------------------
+local function IsCoinValid(coin)
+    return coin 
+        and coin.Parent 
+        and not Coletadas[coin] 
+        and coin.Transparency < 1 
+        and coin:IsDescendantOf(workspace)
+end
+
 local function GetClosestCoin()
     local char = LocalPlayer.Character
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
@@ -297,7 +489,7 @@ local function GetClosestCoin()
     local areaDeBusca = workspace:FindFirstChild("NormalMaps") or workspace:FindFirstChild("Map") or workspace
 
     for _, obj in ipairs(areaDeBusca:GetDescendants()) do
-        if obj:IsA("BasePart") and obj.Parent and not Coletadas[obj] and obj.Transparency < 1 and obj.CanCollide == false then
+        if obj:IsA("BasePart") and IsCoinValid(obj) and obj.CanCollide == false then
             local nome = string.lower(obj.Name)
             if nome:find("coin") or nome:find("gold") or nome:find("token") then
                 if obj.Size.X <= 6 and obj.Size.Y <= 6 and obj.Size.Z <= 6 then
@@ -320,7 +512,7 @@ local currentCoinTween = nil
 
 task.spawn(function()
     while true do
-        task.wait(0.1)
+        task.wait(0.5) -- Checa a cada 0.5 segundos se deve procurar moedas
         while AutoCoinEnabled do
             local char = LocalPlayer.Character
             local hrp = char and char:FindFirstChild("HumanoidRootPart")
@@ -343,16 +535,16 @@ task.spawn(function()
                     bv.Velocity = Vector3.zero
                     bv.Parent = hrp
 
-                    local ultimoScan = 0
-
                     while AutoCoinEnabled do
-                        if not alvo or not alvo.Parent or Coletadas[alvo] or (tick() - ultimoScan > 0.5) then
+                        -- Se a moeda atual foi pega por outro jogador, busca a próxima IMEDIATAMENTE
+                        if not IsCoinValid(alvo) then
+                            if currentCoinTween then
+                                currentCoinTween:Cancel()
+                                currentCoinTween = nil
+                            end
+                            hrp.AssemblyLinearVelocity = Vector3.zero
                             alvo = GetClosestCoin()
-                            ultimoScan = tick()
-                        end
-                        
-                        if not alvo then 
-                            break 
+                            if not alvo then break end
                         end
 
                         local spawnDestino = alvo.Position
@@ -375,8 +567,7 @@ task.spawn(function()
                             
                             Coletadas[alvo] = true
                             alvo = nil 
-                            
-                            task.wait(0.2)
+                            task.wait(0.25) -- Fica 0.25 segundos (250 ms) na moeda antes de avançar
                         else
                             local tempoViagem = math.max(0.05, distancia / AutoCoinSpeed)
                             
@@ -391,7 +582,16 @@ task.spawn(function()
                             local tempoEsperado = tick() + tempoViagem
                             while AutoCoinEnabled and currentCoinTween and currentCoinTween.PlaybackState == Enum.PlaybackState.Playing and tick() < tempoEsperado do
                                 RunService.Heartbeat:Wait()
-                                if not alvo or not alvo.Parent or Coletadas[alvo] then break end
+                                -- Checa em tempo real se a moeda sumiu/ficou invisível
+                                if not IsCoinValid(alvo) then 
+                                    if currentCoinTween then
+                                        currentCoinTween:Cancel()
+                                        currentCoinTween = nil
+                                    end
+                                    hrp.AssemblyLinearVelocity = Vector3.zero
+                                    alvo = nil
+                                    break 
+                                end
                             end
                         end
                         
@@ -408,9 +608,8 @@ task.spawn(function()
                     if bv then bv:Destroy() end
 
                     if not AutoCoinEnabled then break end
-                    task.wait(StopDuration)
                 else
-                    task.wait(1)
+                    task.wait(0.5) -- Espera 0.5s se não houver moeda disponível
                 end
             else
                 task.wait(0.5)
@@ -476,7 +675,6 @@ end
 
 local function UpdateESP()
     for _, p in ipairs(Players:GetPlayers()) do
-        -- MODIFICADO: Condição para incluir LocalPlayer se EspMyPlayerEnabled estiver true
         if (p ~= LocalPlayer or EspMyPlayerEnabled) and p.Character then
             local char = p.Character
             local highlight = char:FindFirstChild("ESPHighlight")
@@ -506,7 +704,6 @@ local function UpdateESP()
                 if highlight then highlight:Destroy() end
             end
         elseif p == LocalPlayer and not EspMyPlayerEnabled then
-            -- Remove highlight se o ESP My Player for desligado
             local highlight = p.Character:FindFirstChild("ESPHighlight")
             if highlight then highlight:Destroy() end
         end
@@ -796,7 +993,7 @@ RunService.RenderStepped:Connect(function()
     if FOVCircle then
         local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
         FOVCircle.Position = screenCenter
-        FOVCircle.Radius = FovSize * 2.5-- MODIFICADO: 2.5x maior
+        FOVCircle.Radius = FovSize * 2.5
         FOVCircle.Visible = FovVisible
     end
 
@@ -889,6 +1086,7 @@ CombatTab:Slider({Title = "FOV", Step = 1, Value = { Min = 50, Max = 500, Defaul
 CombatTab:Toggle({Title = "Anti Fling", Default = false, Callback = function(v) AntiFlingEnabled = v end})
 CombatTab:Toggle({Title = "Knife Aura", Default = false, Callback = function(v) KnifeAuraEnabled = v end})
 CombatTab:Slider({Title = "Distância Aura", Step = 1, Value = {Min = 0, Max = 10, Default = 3}, Callback = function(v) KnifeAuraDistance = v end})
+CombatTab:Toggle({Title = "Shoot button", Default = false, Callback = function(v) ToggleShootButtonGui(v) end})
 
 FlingTab:Button({
     Title = "Fling murderer",
@@ -950,7 +1148,7 @@ Players.PlayerRemoving:Connect(function(p)
 end)
 
 EspTab:Toggle({Title = "ESP Jogadores", Default = false, Callback = function(v) EspEnabled = v end})
-EspTab:Toggle({Title = "ESP My Player", Default = false, Callback = function(v) EspMyPlayerEnabled = v end}) -- NOVO: Toggle ESP My Player
+EspTab:Toggle({Title = "ESP My Player", Default = false, Callback = function(v) EspMyPlayerEnabled = v end})
 EspTab:Toggle({Title = "ESP Arma", Default = false, Callback = function(v) GunEspEnabled = v end})
 
 TeleportTab:Button({
@@ -1150,3 +1348,4 @@ PerformanceTab:Toggle({
         if v then OptimizeTextures() end
     end
 })
+
