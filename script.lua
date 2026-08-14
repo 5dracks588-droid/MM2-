@@ -514,7 +514,7 @@ RunService.Stepped:Connect(function()
 end)
 
 ---------------------------------------------------------------------------
--- [ AUTO COIN COM CONFIGURAÇÕES DE TEMPO DE CHECAGEM E PERMANÊNCIA ]
+-- [ AUTO COIN COM TRAJETO FIXO ININTERRUPTO ]
 ---------------------------------------------------------------------------
 local function IsCoinValid(coin)
     return coin 
@@ -558,7 +558,7 @@ local currentCoinTween = nil
 
 task.spawn(function()
     while true do
-        task.wait(0.5) -- Checa a cada 0.5 segundos se deve procurar moedas
+        task.wait(0.5)
         while AutoCoinEnabled do
             local char = LocalPlayer.Character
             local hrp = char and char:FindFirstChild("HumanoidRootPart")
@@ -581,29 +581,21 @@ task.spawn(function()
                     bv.Velocity = Vector3.zero
                     bv.Parent = hrp
 
-                    while AutoCoinEnabled do
-                        -- Se a moeda atual foi pega por outro jogador, busca a próxima IMEDIATAMENTE
-                        if not IsCoinValid(alvo) then
-                            if currentCoinTween then
-                                currentCoinTween:Cancel()
-                                currentCoinTween = nil
-                            end
-                            hrp.AssemblyLinearVelocity = Vector3.zero
-                            alvo = GetClosestCoin()
-                            if not alvo then break end
-                        end
+                    -- Salva a posição exata da moeda selecionada
+                    local spawnDestino = alvo.Position
+                    if alvo.Parent and alvo.Parent:IsA("Model") and alvo.Parent.PrimaryPart then
+                        spawnDestino = alvo.Parent.PrimaryPart.Position
+                    elseif alvo.Name == "Coin_Sub" and alvo.Parent and alvo.Parent:FindFirstChild("Coin") then
+                        spawnDestino = alvo.Parent.Coin.Position
+                    end
+                    
+                    local destinoFinal = Vector3.new(spawnDestino.X, spawnDestino.Y + 1.2, spawnDestino.Z)
 
-                        local spawnDestino = alvo.Position
-                        if alvo.Parent and alvo.Parent:IsA("Model") and alvo.Parent.PrimaryPart then
-                            spawnDestino = alvo.Parent.PrimaryPart.Position
-                        elseif alvo.Name == "Coin_Sub" and alvo.Parent and alvo.Parent:FindFirstChild("Coin") then
-                            spawnDestino = alvo.Parent.Coin.Position
-                        end
-                        
-                        local destinoFinal = Vector3.new(spawnDestino.X, spawnDestino.Y + 1.2, spawnDestino.Z)
+                    while AutoCoinEnabled do
                         local atualPos = hrp.Position
                         local distancia = (atualPos - destinoFinal).Magnitude
                         
+                        -- Chegou ao local da moeda
                         if distancia <= 0.8 then 
                             if currentCoinTween then
                                 currentCoinTween:Cancel()
@@ -613,7 +605,8 @@ task.spawn(function()
                             
                             Coletadas[alvo] = true
                             alvo = nil 
-                            task.wait(0.25) -- Fica 0.25 segundos (250 ms) na moeda antes de avançar
+                            task.wait(0.25) -- Aguarda 0.25s no local
+                            break -- Encerra este ciclo para buscar uma nova moeda
                         else
                             local tempoViagem = math.max(0.05, distancia / AutoCoinSpeed)
                             
@@ -626,18 +619,9 @@ task.spawn(function()
                             currentCoinTween:Play()
                             
                             local tempoEsperado = tick() + tempoViagem
+                            -- Aguarda a movimentação ser concluída sem interromper caso a moeda seja destruída/pega
                             while AutoCoinEnabled and currentCoinTween and currentCoinTween.PlaybackState == Enum.PlaybackState.Playing and tick() < tempoEsperado do
                                 RunService.Heartbeat:Wait()
-                                -- Checa em tempo real se a moeda sumiu/ficou invisível
-                                if not IsCoinValid(alvo) then 
-                                    if currentCoinTween then
-                                        currentCoinTween:Cancel()
-                                        currentCoinTween = nil
-                                    end
-                                    hrp.AssemblyLinearVelocity = Vector3.zero
-                                    alvo = nil
-                                    break 
-                                end
                             end
                         end
                         
@@ -655,20 +639,10 @@ task.spawn(function()
 
                     if not AutoCoinEnabled then break end
                 else
-                    task.wait(0.5) -- Espera 0.5s se não houver moeda disponível
+                    task.wait(0.5)
                 end
             else
                 task.wait(0.5)
-            end
-        end
-    end
-end)
-
-RunService.Stepped:Connect(function()
-    if NoclipEnabled and LocalPlayer.Character then
-        for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.CanCollide = false
             end
         end
     end
