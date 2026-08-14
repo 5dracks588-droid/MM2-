@@ -353,11 +353,33 @@ local function ToggleShootButtonGui(enable)
         UICorner.CornerRadius = UDim.new(0, 5)
         UICorner.Parent = ShootButton
 
-        local UIStroke = Instance.new("UIStroke")
+                local UIStroke = Instance.new("UIStroke")
         UIStroke.Thickness = 3
-        UIStroke.Color = Color3.fromRGB(0, 0, 0)
+        UIStroke.Color = Color3.fromRGB(255, 255, 255) -- Precisa ser branco para o gradiente aparecer corretamente
         UIStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
         UIStroke.Parent = ShootButton
+
+        -- Cria o efeito de gradiente (Preto e Cinza)
+        local StrokeGradient = Instance.new("UIGradient")
+        StrokeGradient.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 0, 0)),         -- Preto
+            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(150, 150, 150)), -- Cinza
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 0, 0))          -- Preto
+        })
+        StrokeGradient.Parent = UIStroke
+
+        -- Animação do giro contínuo
+        task.spawn(function()
+            local runService = game:GetService("RunService")
+            local rot = 0
+            while ShootButton.Parent do
+                rot = (rot + 3) % 360 -- Aumente ou diminua o '3' para mudar a velocidade do giro
+                if StrokeGradient.Parent then
+                    StrokeGradient.Rotation = rot
+                end
+                runService.Heartbeat:Wait()
+            end
+        end)
 
         ShootButton.MouseButton1Down:Connect(function()
             local Character = LocalPlayer.Character
@@ -1372,4 +1394,3 @@ PerformanceTab:Toggle({
         if v then OptimizeTextures() end
     end
 })
-
