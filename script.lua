@@ -28,9 +28,9 @@ pcall(function()
         bgImage.Name = "MenuWallpaper"
         bgImage.Size = UDim2.fromScale(1, 1)
         bgImage.Position = UDim2.fromScale(0, 0)
-        bgImage.Image = "rbxassetid://140088303441183" -- Cole o ID da sua imagem aqui
+        bgImage.Image = "rbxassetid://140088303441183" 
         bgImage.BackgroundTransparency = 1
-        bgImage.ImageTransparency = 0 -- Transparência da imagem (0 a 1)
+        bgImage.ImageTransparency = 0 
         bgImage.ScaleType = Enum.ScaleType.Crop
         bgImage.ZIndex = 1
         bgImage.Parent = mainFrame
@@ -72,15 +72,18 @@ local Murder, Sheriff
 local AimbotEnabled = false
 local FovVisible = false
 local FovSize = 100
+
+-- CONFIGURAÇÕES DO AUTO COIN
 local AutoCoinEnabled = false
 local AutoCoinSpeed = 25
+local TempoNaMoeda = 0.2
+
 local AutoSafeEnabled = false
 local KnifeAuraEnabled = false
 local KnifeAuraDistance = 3
 local SavedPositions = {}
 
 local EspEnabled = false
-local EspMyPlayerEnabled = false
 local GunEspEnabled = false
 local AntiFlingEnabled = false
 local LowGraphicsEnabled = false
@@ -525,7 +528,7 @@ RunService.Stepped:Connect(function()
 end)
 
 ---------------------------------------------------------------------------
--- [ AUTO COIN COM TRAJETO FIXO ININTERRUPTO ]
+-- [ AUTO COIN COM RADAR E ROTA FIXA ]
 ---------------------------------------------------------------------------
 local function IsCoinValid(coin)
     return coin 
@@ -535,12 +538,8 @@ local function IsCoinValid(coin)
         and coin:IsDescendantOf(workspace)
 end
 
-local function GetClosestCoin()
-    local char = LocalPlayer.Character
-    local hrp = char and char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return nil end
-
-    local menorDistancia = math.huge
+local function GetClosestCoin(centerPos, maxRadius)
+    local menorDistancia = maxRadius or math.huge
     local moedaAlvo = nil
 
     local areaDeBusca = workspace:FindFirstChild("NormalMaps") or workspace:FindFirstChild("Map") or workspace
@@ -552,8 +551,8 @@ local function GetClosestCoin()
                 if obj.Size.X <= 6 and obj.Size.Y <= 6 and obj.Size.Z <= 6 then
                     local model = obj:FindFirstAncestorOfClass("Model")
                     if model and not model:FindFirstChild("Lobby") then
-                        local dist = (hrp.Position - obj.Position).Magnitude
-                        if dist < menorDistancia then
+                        local dist = (centerPos - obj.Position).Magnitude
+                        if dist <= menorDistancia then
                             menorDistancia = dist
                             moedaAlvo = obj
                         end
@@ -569,14 +568,22 @@ local currentCoinTween = nil
 
 task.spawn(function()
     while true do
-        task.wait(0.5)
+        task.wait(0.0005)
+        
         while AutoCoinEnabled do
             local char = LocalPlayer.Character
             local hrp = char and char:FindFirstChild("HumanoidRootPart")
             local hum = char and char:FindFirstChildOfClass("Humanoid")
             
             if hrp and hum and hum.Health > 0 and IsParticipatingAndAlive(LocalPlayer) then
-                local alvo = GetClosestCoin()
+                
+                -- Radar: Primeiro tenta achar num raio de 100 studs da posição atual
+                local alvo = GetClosestCoin(hrp.Position, 100)
+                
+                -- Se não tiver no radar de 100 studs, procura em todo o mapa
+                if not alvo then
+                    alvo = GetClosestCoin(hrp.Position, math.huge)
+                end
                 
                 if alvo then
                     local noclipConnection = RunService.Stepped:Connect(function()
@@ -600,54 +607,61 @@ task.spawn(function()
                     end
                     
                     local destinoFinal = Vector3.new(spawnDestino.X, spawnDestino.Y + 1.2, spawnDestino.Z)
-
+                    
+                    local atualPos = hrp.Position
+                    local distancia = (atualPos - destinoFinal).Magnitude
+                    local tempoViagem = math.max(0.05, distancia / AutoCoinSpeed)
+                    
+                    if currentCoinTween then
+                        currentCoinTween:Cancel()
+                    end
+                    
+                    local tweenInfo = TweenInfo.new(tempoViagem, Enum.EasingStyle.Linear)
+                    currentCoinTween = TweenService:Create(hrp, tweenInfo, {CFrame = CFrame.new(destinoFinal)})
+                    currentCoinTween:Play()
+                    
+                    local tempoEsperado = tick() + tempoViagem
+                    
+                    -- Trajeto Fixo: Não muda de alvo no meio do caminho
                     while AutoCoinEnabled do
-                        local atualPos = hrp.Position
-                        local distancia = (atualPos - destinoFinal).Magnitude
+                        local currentPos = hrp.Position
+                        local distToTarget = (currentPos - destinoFinal).Magnitude
                         
-                        if distancia <= 0.8 then 
-                            if currentCoinTween then
-                                currentCoinTween:Cancel()
-                                currentCoinTween = nil
-                            end
-                            hrp.AssemblyLinearVelocity = Vector3.zero
-                            
-                            Coletadas[alvo] = true
-                            alvo = nil 
-                            task.wait(0.25)
+                        if distToTarget <= 0.8 or tick() >= tempoEsperado then 
                             break
-                        else
-                            local tempoViagem = math.max(0.05, distancia / AutoCoinSpeed)
-                            
-                            if currentCoinTween then
-                                currentCoinTween:Cancel()
-                            end
-                            
-                            local tweenInfo = TweenInfo.new(tempoViagem, Enum.EasingStyle.Linear)
-                            currentCoinTween = TweenService:Create(hrp, tweenInfo, {CFrame = CFrame.new(destinoFinal)})
-                            currentCoinTween:Play()
-                            
-                            local tempoEsperado = tick() + tempoViagem
-                            while AutoCoinEnabled and currentCoinTween and currentCoinTween.PlaybackState == Enum.PlaybackState.Playing and tick() < tempoEsperado do
-                                RunService.Heartbeat:Wait()
-                            end
                         end
-                        
                         RunService.Heartbeat:Wait()
                     end
 
+                    -- CANCELA O TWEEN AO CHEGAR
                     if currentCoinTween then
                         currentCoinTween:Cancel()
                         currentCoinTween = nil
                     end
+                    
+                    -- TRAVA O PERSONAGEM COMPLETAMENTE NA MOEDA
                     hrp.AssemblyLinearVelocity = Vector3.zero
+                    hrp.AssemblyAngularVelocity = Vector3.zero
+                    if bv then 
+                        bv.Velocity = Vector3.zero 
+                    end
+                    
+                    -- Registra a moeda como coletada
+                    if alvo and alvo.Parent then
+                        Coletadas[alvo] = true
+                    end
+                    
+                    -- PAUSA (TRAVADO) POR 200 MILÉSIMOS
+                    task.wait(TempoNaMoeda)
 
+                    -- Limpa o voo para ir pra próxima
                     if noclipConnection then noclipConnection:Disconnect() end
                     if bv then bv:Destroy() end
 
                     if not AutoCoinEnabled then break end
                 else
-                    task.wait(0.5)
+                    -- SE NÃO ACHAR NENHUMA MOEDA NO MAPA, ELE DORME (ESPERA) 1 SEGUNDO ANTES DE PROCURAR DE NOVO
+                    task.wait(1)
                 end
             else
                 task.wait(0.5)
@@ -703,7 +717,7 @@ end
 
 local function UpdateESP()
     for _, p in ipairs(Players:GetPlayers()) do
-        if (p ~= LocalPlayer or EspMyPlayerEnabled) and p.Character then
+        if p ~= LocalPlayer and p.Character then
             local char = p.Character
             local highlight = char:FindFirstChild("ESPHighlight")
 
@@ -731,8 +745,8 @@ local function UpdateESP()
             else
                 if highlight then highlight:Destroy() end
             end
-        elseif p == LocalPlayer and not EspMyPlayerEnabled then
-            local highlight = p.Character:FindFirstChild("ESPHighlight")
+        elseif p == LocalPlayer then
+            local highlight = p.Character and p.Character:FindFirstChild("ESPHighlight")
             if highlight then highlight:Destroy() end
         end
     end
@@ -1176,7 +1190,6 @@ Players.PlayerRemoving:Connect(function(p)
 end)
 
 EspTab:Toggle({Title = "ESP Jogadores", Default = false, Callback = function(v) EspEnabled = v end})
-EspTab:Toggle({Title = "ESP My Player", Default = false, Callback = function(v) EspMyPlayerEnabled = v end})
 EspTab:Toggle({Title = "ESP Arma", Default = false, Callback = function(v) GunEspEnabled = v end})
 
 TeleportTab:Button({
