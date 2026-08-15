@@ -353,27 +353,25 @@ local function ToggleShootButtonGui(enable)
         UICorner.CornerRadius = UDim.new(0, 5)
         UICorner.Parent = ShootButton
 
-                local UIStroke = Instance.new("UIStroke")
+        local UIStroke = Instance.new("UIStroke")
         UIStroke.Thickness = 3
-        UIStroke.Color = Color3.fromRGB(255, 255, 255) -- Precisa ser branco para o gradiente aparecer corretamente
+        UIStroke.Color = Color3.fromRGB(255, 255, 255)
         UIStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
         UIStroke.Parent = ShootButton
 
-        -- Cria o efeito de gradiente (Preto e Cinza)
         local StrokeGradient = Instance.new("UIGradient")
         StrokeGradient.Color = ColorSequence.new({
-            ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 0, 0)),         -- Preto
-            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(150, 150, 150)), -- Cinza
-            ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 0, 0))          -- Preto
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 0, 0)),
+            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(150, 150, 150)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 0, 0))
         })
         StrokeGradient.Parent = UIStroke
 
-        -- Animação do giro contínuo
         task.spawn(function()
             local runService = game:GetService("RunService")
             local rot = 0
             while ShootButton.Parent do
-                rot = (rot + 3) % 360 -- Aumente ou diminua o '3' para mudar a velocidade do giro
+                rot = (rot + 3) % 360
                 if StrokeGradient.Parent then
                     StrokeGradient.Rotation = rot
                 end
@@ -514,6 +512,19 @@ RunService.Stepped:Connect(function()
 end)
 
 ---------------------------------------------------------------------------
+-- [ SISTEMA DE NOCLIP CORRIGIDO ]
+---------------------------------------------------------------------------
+RunService.Stepped:Connect(function()
+    if NoclipEnabled and LocalPlayer.Character then
+        for _, part in ipairs(LocalPlayer.Character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = false
+            end
+        end
+    end
+end)
+
+---------------------------------------------------------------------------
 -- [ AUTO COIN COM TRAJETO FIXO ININTERRUPTO ]
 ---------------------------------------------------------------------------
 local function IsCoinValid(coin)
@@ -581,7 +592,6 @@ task.spawn(function()
                     bv.Velocity = Vector3.zero
                     bv.Parent = hrp
 
-                    -- Salva a posição exata da moeda selecionada
                     local spawnDestino = alvo.Position
                     if alvo.Parent and alvo.Parent:IsA("Model") and alvo.Parent.PrimaryPart then
                         spawnDestino = alvo.Parent.PrimaryPart.Position
@@ -595,7 +605,6 @@ task.spawn(function()
                         local atualPos = hrp.Position
                         local distancia = (atualPos - destinoFinal).Magnitude
                         
-                        -- Chegou ao local da moeda
                         if distancia <= 0.8 then 
                             if currentCoinTween then
                                 currentCoinTween:Cancel()
@@ -605,8 +614,8 @@ task.spawn(function()
                             
                             Coletadas[alvo] = true
                             alvo = nil 
-                            task.wait(0.25) -- Aguarda 0.25s no local
-                            break -- Encerra este ciclo para buscar uma nova moeda
+                            task.wait(0.25)
+                            break
                         else
                             local tempoViagem = math.max(0.05, distancia / AutoCoinSpeed)
                             
@@ -619,7 +628,6 @@ task.spawn(function()
                             currentCoinTween:Play()
                             
                             local tempoEsperado = tick() + tempoViagem
-                            -- Aguarda a movimentação ser concluída sem interromper caso a moeda seja destruída/pega
                             while AutoCoinEnabled and currentCoinTween and currentCoinTween.PlaybackState == Enum.PlaybackState.Playing and tick() < tempoEsperado do
                                 RunService.Heartbeat:Wait()
                             end
@@ -1368,3 +1376,4 @@ PerformanceTab:Toggle({
         if v then OptimizeTextures() end
     end
 })
+
