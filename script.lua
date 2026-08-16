@@ -77,6 +77,8 @@ local FovSize = 100
 local AutoCoinEnabled = false
 local AutoCoinSpeed = 25
 local TempoNaMoeda = 0.2
+local AutoPrestigeEnabled = false
+
 
 local AutoSafeEnabled = false
 local KnifeAuraEnabled = false
@@ -1355,6 +1357,53 @@ FarmTab:Toggle({
                 task.wait()
             end
         end)
+    end
+})
+
+FarmTab:Toggle({
+    Title = "Auto prestígio",
+    Default = false,
+    Callback = function(v)
+        AutoPrestigeEnabled = v
+        if v then
+            task.spawn(function()
+                while AutoPrestigeEnabled do
+                    pcall(function()
+                        -- Verifica o nível do jogador (MM2 geralmente guarda isso na pasta 'Data' ou 'leaderstats')
+                        local isLevel100 = false
+                        local dataLevel = LocalPlayer:FindFirstChild("Data") and LocalPlayer.Data:FindFirstChild("Level")
+                        local leaderstatsLevel = LocalPlayer:FindFirstChild("leaderstats") and LocalPlayer.leaderstats:FindFirstChild("Level")
+                        
+                        if dataLevel and tonumber(dataLevel.Value) >= 100 then
+                            isLevel100 = true
+                        elseif leaderstatsLevel and tonumber(leaderstatsLevel.Value) >= 100 then
+                            isLevel100 = true
+                        end
+                        
+                        -- Se o script não conseguir achar a pasta de nível (caso o jogo atualize), ele tenta fazer o prestígio por precaução
+                        if not dataLevel and not leaderstatsLevel then
+                            isLevel100 = true 
+                        end
+                        
+                        -- Envia o comando de Prestige para o servidor
+                        if isLevel100 then
+                            for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
+                                if obj.Name == "Prestige" and (obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction")) then
+                                    if obj:IsA("RemoteEvent") then
+                                        obj:FireServer()
+                                    elseif obj:IsA("RemoteFunction") then
+                                        obj:InvokeServer()
+                                    end
+                                    break -- Interrompe a busca após achar e executar
+                                end
+                            end
+                        end
+                    end)
+                    -- Espera 10 segundos antes de checar de novo para não travar o jogo
+                    task.wait(10)
+                end
+            end)
+        end
     end
 })
 
