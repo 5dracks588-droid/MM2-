@@ -607,7 +607,7 @@ local currentCoinTween = nil
 
 task.spawn(function()
     while true do
-        task.wait(0.05)
+        task.wait(0.2)
         
         while AutoCoinEnabled do
             local char = LocalPlayer.Character
