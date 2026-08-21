@@ -44,7 +44,7 @@ Window:EditOpenButton({
     StrokeThickness = 2,
     Color = ColorSequence.new(
         Color3.fromHex("000000"),
-        Color3.fromHex("000000")
+        Color3.fromHex("#282828")
     ),
     OnlyMobile = false,
     Enabled = true,
@@ -570,7 +570,7 @@ local currentCoinTween = nil
 
 task.spawn(function()
     while true do
-        task.wait(0.0005)
+        task.wait(0.05)
         
         while AutoCoinEnabled do
             local char = LocalPlayer.Character
