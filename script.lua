@@ -73,17 +73,16 @@ local AimbotEnabled = false
 local FovVisible = false
 local FovSize = 100
 
+-- Variáveis Kill Aura
+local KillAuraEnabled = false
+local KillAuraDistance = math.huge
+
 -- CONFIGURAÇÕES DO AUTO COIN
 local AutoCoinEnabled = false
 local AutoCoinSpeed = 25
 local TempoNaMoeda = 0.2
 local AutoPrestigeEnabled = false
-
-
 local AutoSafeEnabled = false
-local KnifeAuraEnabled = false
-local KnifeAuraDistance = 3
-local SavedPositions = {}
 
 local EspEnabled = false
 local GunEspEnabled = false
@@ -231,6 +230,50 @@ local function GetMurdererPlayer()
     end
     return nil
 end
+
+---------------------------------------------------------------------------
+-- [ LOOP DA KILL AURA (Mecanismo Original) ]
+---------------------------------------------------------------------------
+task.spawn(function()
+    while task.wait(0.05) do
+        -- Só executa se a Kill Aura estiver ativada, jogador existir e a classe for Murderer
+        if KillAuraEnabled and GetPlayerRole(LocalPlayer) == "Murderer" and LocalPlayer.Character then
+            
+            local myHRP = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            local equippedTool = LocalPlayer.Character:FindFirstChildOfClass("Tool")
+            local handle = equippedTool and equippedTool:FindFirstChild("Handle")
+
+            if equippedTool and handle and myHRP then
+                
+                -- Varre todos os jogadores do servidor
+                for _, p in ipairs(Players:GetPlayers()) do
+                    if p ~= LocalPlayer and IsParticipatingAndAlive(p) then
+                        local pChar = p.Character
+                        
+                        if pChar and pChar:FindFirstChild("HumanoidRootPart") and pChar:FindFirstChild("Humanoid") then
+                            local targetHRP = pChar.HumanoidRootPart
+                            local targetHum = pChar.Humanoid
+                            
+                            -- Se o alvo estiver vivo
+                            if targetHum.Health > 0 then
+                                
+                                local distance = (myHRP.Position - targetHRP.Position).Magnitude
+                                
+                                if distance <= KillAuraDistance then
+                                    pcall(function()
+                                        -- Simula o toque da faca no jogador
+                                        firetouchinterest(handle, targetHRP, 0)
+                                        firetouchinterest(handle, targetHRP, 1)
+                                    end)
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+end)
 
 ---------------------------------------------------------------------------
 -- [ PREDIÇÃO 3D AVANÇADA PARA O SHOOT BUTTON ]
@@ -514,12 +557,6 @@ RunService.Stepped:Connect(function()
             end
         end
     end
-end)
-
----------------------------------------------------------------------------
--- [ SISTEMA DE NOCLIP CORRIGIDO ]
----------------------------------------------------------------------------
-RunService.Stepped:Connect(function()
     if NoclipEnabled and LocalPlayer.Character then
         for _, part in ipairs(LocalPlayer.Character:GetDescendants()) do
             if part:IsA("BasePart") then
@@ -579,10 +616,8 @@ task.spawn(function()
             
             if hrp and hum and hum.Health > 0 and IsParticipatingAndAlive(LocalPlayer) then
                 
-                -- Radar: Primeiro tenta achar num raio de 100 studs da posição atual
                 local alvo = GetClosestCoin(hrp.Position, 100)
                 
-                -- Se não tiver no radar de 100 studs, procura em todo o mapa
                 if not alvo then
                     alvo = GetClosestCoin(hrp.Position, math.huge)
                 end
@@ -624,7 +659,6 @@ task.spawn(function()
                     
                     local tempoEsperado = tick() + tempoViagem
                     
-                    -- Trajeto Fixo: Não muda de alvo no meio do caminho
                     while AutoCoinEnabled do
                         local currentPos = hrp.Position
                         local distToTarget = (currentPos - destinoFinal).Magnitude
@@ -635,34 +669,28 @@ task.spawn(function()
                         RunService.Heartbeat:Wait()
                     end
 
-                    -- CANCELA O TWEEN AO CHEGAR
                     if currentCoinTween then
                         currentCoinTween:Cancel()
                         currentCoinTween = nil
                     end
                     
-                    -- TRAVA O PERSONAGEM COMPLETAMENTE NA MOEDA
                     hrp.AssemblyLinearVelocity = Vector3.zero
                     hrp.AssemblyAngularVelocity = Vector3.zero
                     if bv then 
                         bv.Velocity = Vector3.zero 
                     end
                     
-                    -- Registra a moeda como coletada
                     if alvo and alvo.Parent then
                         Coletadas[alvo] = true
                     end
                     
-                    -- PAUSA (TRAVADO) POR 200 MILÉSIMOS
                     task.wait(TempoNaMoeda)
 
-                    -- Limpa o voo para ir pra próxima
                     if noclipConnection then noclipConnection:Disconnect() end
                     if bv then bv:Destroy() end
 
                     if not AutoCoinEnabled then break end
                 else
-                    -- SE NÃO ACHAR NENHUMA MOEDA NO MAPA, ELE DORME (ESPERA) 1 SEGUNDO ANTES DE PROCURAR DE NOVO
                     task.wait(1)
                 end
             else
@@ -1095,30 +1123,6 @@ RunService.RenderStepped:Connect(function()
             end
         end
     end
-
-    if KnifeAuraEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-        local myHRP = LocalPlayer.Character.HumanoidRootPart
-        for _,plr in pairs(Players:GetPlayers()) do
-            if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") and plr.Character:FindFirstChild("Humanoid") and plr.Character.Humanoid.Health > 0 then
-                local targetHRP = plr.Character.HumanoidRootPart
-                if (targetHRP.Position - SafePart.Position).Magnitude > 50 then
-                    if not SavedPositions[plr] then SavedPositions[plr] = targetHRP.CFrame end
-                    targetHRP.CFrame = CFrame.new(myHRP.Position + (myHRP.CFrame.LookVector * KnifeAuraDistance))
-                    targetHRP.AssemblyLinearVelocity = Vector3.zero
-                    targetHRP.AssemblyAngularVelocity = Vector3.zero
-                end
-            end
-        end
-    else
-        for plr, savedCFrame in pairs(SavedPositions) do
-            if plr and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-                plr.Character.HumanoidRootPart.CFrame = savedCFrame
-                plr.Character.HumanoidRootPart.AssemblyLinearVelocity = Vector3.zero
-                plr.Character.HumanoidRootPart.AssemblyAngularVelocity = Vector3.zero
-            end
-        end
-        SavedPositions = {}
-    end
 end)
 
 ---------------------------------------------------------------------------
@@ -1128,8 +1132,16 @@ CombatTab:Toggle({Title = "Aimbot", Default = false, Callback = function(v) Aimb
 CombatTab:Toggle({Title = "Mostrar FOV", Default = false, Callback = function(v) FovVisible = v end})
 CombatTab:Slider({Title = "FOV", Step = 1, Value = { Min = 50, Max = 500, Default = 100 }, Callback = function(v) FovSize = v end})
 CombatTab:Toggle({Title = "Anti Fling", Default = false, Callback = function(v) AntiFlingEnabled = v end})
-CombatTab:Toggle({Title = "Knife Aura", Default = false, Callback = function(v) KnifeAuraEnabled = v end})
-CombatTab:Slider({Title = "Distância Aura", Step = 1, Value = {Min = 0, Max = 10, Default = 3}, Callback = function(v) KnifeAuraDistance = v end})
+
+-- [ KILL AURA ADICIONADA AQUI ]
+CombatTab:Toggle({
+    Title = "Knife aura", 
+    Default = false, 
+    Callback = function(v)
+        KillAuraEnabled = v
+    end
+})
+
 CombatTab:Toggle({Title = "Shoot button", Default = false, Callback = function(v) ToggleShootButtonGui(v) end})
 
 FlingTab:Button({
@@ -1369,7 +1381,6 @@ FarmTab:Toggle({
             task.spawn(function()
                 while AutoPrestigeEnabled do
                     pcall(function()
-                        -- Verifica o nível do jogador (MM2 geralmente guarda isso na pasta 'Data' ou 'leaderstats')
                         local isLevel100 = false
                         local dataLevel = LocalPlayer:FindFirstChild("Data") and LocalPlayer.Data:FindFirstChild("Level")
                         local leaderstatsLevel = LocalPlayer:FindFirstChild("leaderstats") and LocalPlayer.leaderstats:FindFirstChild("Level")
@@ -1380,12 +1391,10 @@ FarmTab:Toggle({
                             isLevel100 = true
                         end
                         
-                        -- Se o script não conseguir achar a pasta de nível (caso o jogo atualize), ele tenta fazer o prestígio por precaução
                         if not dataLevel and not leaderstatsLevel then
                             isLevel100 = true 
                         end
                         
-                        -- Envia o comando de Prestige para o servidor
                         if isLevel100 then
                             for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
                                 if obj.Name == "Prestige" and (obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction")) then
@@ -1394,12 +1403,11 @@ FarmTab:Toggle({
                                     elseif obj:IsA("RemoteFunction") then
                                         obj:InvokeServer()
                                     end
-                                    break -- Interrompe a busca após achar e executar
+                                    break
                                 end
                             end
                         end
                     end)
-                    -- Espera 10 segundos antes de checar de novo para não travar o jogo
                     task.wait(10)
                 end
             end)
