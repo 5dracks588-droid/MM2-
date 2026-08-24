@@ -1247,54 +1247,75 @@ TeleportTab:Button({
 
 TeleportTab:Button({Title = "Atualizar Lista", Callback = function() AtualizarTodasAsListas() end})
 TeleportTab:Button({Title = "TP Área Segura", Callback = function() TeleportToSafeArea() end})
+-- Função necessária para o teleporte funcionar
+local function TeleportToCFrame(targetCFrame)
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(targetCFrame.Position)
+    end
+end
+
+-- Botão TP Lobby (Teleporta para a posição exata solicitada)
 TeleportTab:Button({
     Title = "TP Lobby",
     Callback = function()
-        local lobby = workspace:FindFirstChild("Lobby") or workspace:FindFirstChild("LobbyWorkspace")
-        if lobby then
-            local spawnLocation = lobby:FindFirstChildWhichIsA("SpawnLocation", true)
-            if spawnLocation then TeleportToCFrame(spawnLocation.CFrame * CFrame.new(0, 5, 0)); return end
-        end
-        TeleportToCFrame(CFrame.new(-108, 145, 12))
+        TeleportToCFrame(CFrame.new(10, 504, -12))
     end
 })
 
 TeleportTab:Button({
     Title = "TP Arena de Jogo",
     Callback = function()
-        local foundSpawn = nil
+        local lobbyPos = Vector3.new(14, 504, -12)
+        local validSpawns = {}
+        
+        -- 1. Varre o workspace procurando por modelos de mapas válidos
         for _, obj in ipairs(workspace:GetChildren()) do
-            if obj:IsA("Model") and obj.Name ~= "Lobby" and obj.Name ~= "LobbyWorkspace" and obj.Name ~= "Camera" and obj.Name ~= "Terrain" then
-                local spawns = obj:FindFirstChild("Spawns") or obj:FindFirstChild("PlayerSpawns") or obj:FindFirstChild("SpawnLocations")
-                if spawns and #spawns:GetChildren() > 0 then
-                    local spawnList = spawns:GetChildren()
-                    local randomSpawn = spawnList[math.random(1, #spawnList)]
-                    if randomSpawn:IsA("BasePart") then
-                        foundSpawn = randomSpawn.CFrame
-                        break
-                    end
-                end
-            end
-        end
-        if not foundSpawn then
-            local activeMapFolder = workspace:FindFirstChild("NormalMaps") or workspace:FindFirstChild("Map")
-            if activeMapFolder then
-                for _, mapModel in ipairs(activeMapFolder:GetChildren()) do
-                    if mapModel.Name ~= "Lobby" then
-                        local spawns = mapModel:FindFirstChild("Spawns") or mapModel:FindFirstChild("PlayerSpawns")
-                        if spawns and #spawns:GetChildren() > 0 then
-                            local spawnList = spawns:GetChildren()
-                            local randomSpawn = spawnList[math.random(1, #spawnList)]
-                            if randomSpawn:IsA("BasePart") then
-                                foundSpawn = randomSpawn.CFrame
-                                break
+            -- Ignora tudo que for jogador ou lobby
+            if obj:IsA("Model") and obj.Name ~= "Lobby" and obj.Name ~= "LobbyWorkspace" and obj.Name ~= "SafeArea" and not Players:GetPlayerFromCharacter(obj) then
+                
+                -- Procura estritamente pela pasta de Spawns da arena do MM2
+                local spawnsFolder = obj:FindFirstChild("Spawns")
+                if spawnsFolder then
+                    for _, spawnPart in ipairs(spawnsFolder:GetChildren()) do
+                        if spawnPart:IsA("BasePart") then
+                            -- Verifica se o spawn está longe do lobby para confirmar que é o mapa do jogo
+                            if (spawnPart.Position - lobbyPos).Magnitude >= 500 then
+                                table.insert(validSpawns, spawnPart)
                             end
                         end
                     end
                 end
             end
         end
-        if foundSpawn then TeleportToCFrame(foundSpawn + Vector3.new(0, 3, 0)) end
+
+        -- 2. Sistema de backup caso o mapa esteja dentro da pasta "NormalMaps"
+        if #validSpawns == 0 then
+            local normalMaps = workspace:FindFirstChild("NormalMaps")
+            if normalMaps then
+                for _, map in ipairs(normalMaps:GetChildren()) do
+                    local spawnsFolder = map:FindFirstChild("Spawns")
+                    if spawnsFolder then
+                        for _, spawnPart in ipairs(spawnsFolder:GetChildren()) do
+                            if spawnPart:IsA("BasePart") then
+                                if (spawnPart.Position - lobbyPos).Magnitude >= 500 then
+                                    table.insert(validSpawns, spawnPart)
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        
+        -- 3. Teleporta para um dos spawns válidos encontrados
+        if #validSpawns > 0 then 
+            local randomSpawn = validSpawns[math.random(1, #validSpawns)]
+            -- O "+ CFrame.new(0, 4, 0)" garante que você caia em cima do bloco, e não dentro do chão
+            TeleportToCFrame(randomSpawn.CFrame * CFrame.new(0, 4, 0)) 
+        else
+            -- Se imprimir isso no F9, significa que a partida ainda não começou ou o mapa ainda não carregou
+            print("Nenhum spawn de arena encontrado! A partida já começou?")
+        end
     end
 })
 
