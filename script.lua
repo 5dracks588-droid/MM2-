@@ -4,7 +4,7 @@ local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footag
 local Window = WindUI:CreateWindow({
     Title = "Murder Mystery 2",
     Icon = "rbxassetid://70820218321157",
-    Author = "RED",
+    Author = "ദ്ദി(˵•̀ ᴗ -˵)",
     Folder = "MM2WindUI",
     Size = UDim2.fromOffset(580,430),
     Transparent = false,
@@ -427,7 +427,7 @@ local function ToggleShootButtonGui(enable)
             end
         end)
 
-        ShootButton.MouseButton1Down:Connect(function()
+                ShootButton.MouseButton1Down:Connect(function()
             local Character = LocalPlayer.Character
             local Backpack = LocalPlayer:FindFirstChild("Backpack")
             
@@ -440,6 +440,39 @@ local function ToggleShootButtonGui(enable)
                 end
 
                 activeSilentAim = true
+                
+                -- [ NOVO SISTEMA: PUXAR E CONGELAR O MURDERER ]
+                task.spawn(function()
+                    local murderer = GetMurdererPlayer()
+                    if murderer and murderer.Character then
+                        local murdHRP = murderer.Character:FindFirstChild("HumanoidRootPart")
+                        local myHRP = Character:FindFirstChild("HumanoidRootPart")
+                        
+                        if murdHRP and myHRP then
+                            -- Pega a distância entre você e o Murderer
+                            local distancia = (myHRP.Position - murdHRP.Position).Magnitude
+                            
+                            -- Se ele estiver em até 20 studs
+                            if distancia <= 20 then
+                                local originalAnchored = murdHRP.Anchored
+                                
+                                -- Puxa ele para a posição exata da mira/predição do tiro
+                                murdHRP.CFrame = cachedTargetCFrame
+                                murdHRP.AssemblyLinearVelocity = Vector3.zero
+                                murdHRP.Anchored = true -- Trava ele na posição
+                                
+                                -- Aguarda 0.1 segundos
+                                task.wait(0.1)
+                                
+                                -- Solta ele
+                                if murdHRP then
+                                    murdHRP.Anchored = originalAnchored
+                                end
+                            end
+                        end
+                    end
+                end)
+                -- [ FIM DO NOVO SISTEMA ]
                 
                 local ScreenSize = Camera.ViewportSize
                 local CenterX = ScreenSize.X / 2
