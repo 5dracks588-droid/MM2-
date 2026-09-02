@@ -4,7 +4,7 @@ local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footag
 local Window = WindUI:CreateWindow({
     Title = "Murder Mystery 2",
     Icon = "rbxassetid://70820218321157",
-    Author = "ദ്ദി(˵•̀ ᴗ -˵)",
+    Author = "RED👻",
     Folder = "MM2WindUI",
     Size = UDim2.fromOffset(580,430),
     Transparent = false,
@@ -427,7 +427,7 @@ local function ToggleShootButtonGui(enable)
             end
         end)
 
-                ShootButton.MouseButton1Down:Connect(function()
+ ShootButton.MouseButton1Down:Connect(function()
             local Character = LocalPlayer.Character
             local Backpack = LocalPlayer:FindFirstChild("Backpack")
             
@@ -435,13 +435,13 @@ local function ToggleShootButtonGui(enable)
                 local gunInBackpack = Backpack:FindFirstChild("Gun")
                 local gunInChar = Character:FindFirstChild("Gun")
                 
+                -- 1. Equipa a arma se ela estiver na mochila
                 if gunInBackpack and not gunInChar then
                     gunInBackpack.Parent = Character
+                    gunInChar = gunInBackpack
                 end
 
-                activeSilentAim = true
-                
-                -- [ NOVO SISTEMA: PUXAR E CONGELAR O MURDERER ]
+                -- 2. Sistema de puxar/congelar (mantido do seu script)
                 task.spawn(function()
                     local murderer = GetMurdererPlayer()
                     if murderer and murderer.Character then
@@ -449,22 +449,13 @@ local function ToggleShootButtonGui(enable)
                         local myHRP = Character:FindFirstChild("HumanoidRootPart")
                         
                         if murdHRP and myHRP then
-                            -- Pega a distância entre você e o Murderer
                             local distancia = (myHRP.Position - murdHRP.Position).Magnitude
-                            
-                            -- Se ele estiver em até 20 studs
                             if distancia <= 20 then
                                 local originalAnchored = murdHRP.Anchored
-                                
-                                -- Puxa ele para a posição exata da mira/predição do tiro
                                 murdHRP.CFrame = cachedTargetCFrame
                                 murdHRP.AssemblyLinearVelocity = Vector3.zero
-                                murdHRP.Anchored = true -- Trava ele na posição
-                                
-                                -- Aguarda 0.1 segundos
+                                murdHRP.Anchored = true
                                 task.wait(0.1)
-                                
-                                -- Solta ele
                                 if murdHRP then
                                     murdHRP.Anchored = originalAnchored
                                 end
@@ -472,17 +463,26 @@ local function ToggleShootButtonGui(enable)
                         end
                     end
                 end)
-                -- [ FIM DO NOVO SISTEMA ]
+
+                -- 3. Dispara o RemoteEvent direto para o Murderer
+                if gunInChar then
+                    local shootEvent = gunInChar:FindFirstChild("Shoot")
+                    local handle = gunInChar:FindFirstChild("Handle")
+                    local myHRP = Character:FindFirstChild("HumanoidRootPart")
+                    
+                    if shootEvent and shootEvent:IsA("RemoteEvent") then
+                        -- Arg 1: Origem (Posição da sua arma ou corpo)
+                        local originPos = handle and handle.CFrame or (myHRP and myHRP.CFrame) or CFrame.new()
+                        -- Arg 2: Destino (A mira preditiva que vai em direção ao Murderer)
+                        local targetPos = cachedTargetCFrame
+                        
+                        -- Fogo direto no servidor, sem precisar clicar
+                        shootEvent:FireServer(originPos, targetPos)
+                    end
+                end
                 
-                local ScreenSize = Camera.ViewportSize
-                local CenterX = ScreenSize.X / 2
-                local CenterY = ScreenSize.Y / 2
-                
-                VirtualInputManager:SendTouchEvent(111222, 0, CenterX, CenterY)
-                VirtualInputManager:SendTouchEvent(111222, 2, CenterX, CenterY)
-                
+                -- 4. Guarda a arma rapidamente após o tiro
                 task.delay(0.05, function()
-                    activeSilentAim = false
                     local currentGun = Character:FindFirstChild("Gun")
                     if currentGun then
                         currentGun.Parent = Backpack
@@ -1500,4 +1500,3 @@ PerformanceTab:Toggle({
         if v then OptimizeTextures() end
     end
 })
-
