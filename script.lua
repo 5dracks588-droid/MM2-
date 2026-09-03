@@ -76,6 +76,7 @@ local FovSize = 100
 -- Variáveis Kill Aura
 local KillAuraEnabled = false
 local KillAuraDistance = math.huge
+local ThrowKnifeEnabled = false
 
 -- CONFIGURAÇÕES DO AUTO COIN
 local AutoCoinEnabled = false
@@ -370,6 +371,131 @@ pcall(function()
     setreadonly(mt, true)
 end)
 
+local ThrowButtonGui = nil
+
+-- Função auxiliar para encontrar o jogador vivo mais próximo
+local function GetClosestPlayer()
+    local closestPlayer = nil
+    local shortestDistance = math.huge
+    local myChar = LocalPlayer.Character
+    if not myChar or not myChar:FindFirstChild("HumanoidRootPart") then return nil end
+    local myPos = myChar.HumanoidRootPart.Position
+
+    for _, player in ipairs(game:GetService("Players"):GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+            if humanoid and humanoid.Health > 0 then
+                local dist = (player.Character.HumanoidRootPart.Position - myPos).Magnitude
+                if dist < shortestDistance then
+                    shortestDistance = dist
+                    closestPlayer = player
+                end
+            end
+        end
+    end
+    return closestPlayer
+end
+
+local function ToggleThrowButtonGui(enable)
+    if enable then
+        if ThrowButtonGui then ThrowButtonGui:Destroy() end
+
+        local ScreenGui = Instance.new("ScreenGui")
+        ScreenGui.Name = "ThrowButtonGui"
+        ScreenGui.ResetOnSpawn = false
+        ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+        ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+        local ThrowButton = Instance.new("TextButton")
+        ThrowButton.Name = "ThrowButton"
+        ThrowButton.Size = UDim2.new(0, 150, 0, 70)
+        ThrowButton.Position = UDim2.new(0.75, 0, 0.35, -20)
+        ThrowButton.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+        ThrowButton.BackgroundTransparency = 0.5
+        ThrowButton.Text = "THROW KNIFE"
+        ThrowButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+        ThrowButton.TextSize = 18
+        ThrowButton.Font = Enum.Font.SourceSans
+        ThrowButton.Active = true
+        ThrowButton.Draggable = false
+        ThrowButton.Parent = ScreenGui
+
+        local UICorner = Instance.new("UICorner")
+        UICorner.CornerRadius = UDim.new(0, 5)
+        UICorner.Parent = ThrowButton
+
+        local UIStroke = Instance.new("UIStroke")
+        UIStroke.Thickness = 3
+        UIStroke.Color = Color3.fromRGB(255, 255, 255)
+        UIStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+        UIStroke.Parent = ThrowButton
+
+        local StrokeGradient = Instance.new("UIGradient")
+        StrokeGradient.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 0, 0)),
+            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(150, 150, 150)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 0, 0))
+        })
+        StrokeGradient.Parent = UIStroke
+
+        task.spawn(function()
+            local runService = game:GetService("RunService")
+            local rot = 0
+            while ThrowButton.Parent do
+                rot = (rot + 3) % 360
+                if StrokeGradient.Parent then
+                    StrokeGradient.Rotation = rot
+                end
+                runService.Heartbeat:Wait()
+            end
+        end)
+
+        ThrowButton.MouseButton1Down:Connect(function()
+    pcall(function()
+        local char = LocalPlayer.Character
+        if not char then return end
+
+        -- Garante que a faca existe
+        local knife = char:FindFirstChild("Knife") or LocalPlayer.Backpack:FindFirstChild("Knife")
+        if not knife then return end
+
+        -- Equipa a faca (o servidor rejeita o RemoteEvent se ela estiver na mochila)
+        if knife.Parent == LocalPlayer.Backpack then
+            knife.Parent = char
+            task.wait(0.05)
+        end
+
+        local events = knife:FindFirstChild("Events")
+        local knifeThrown = events and events:FindFirstChild("KnifeThrown")
+        if not knifeThrown then return end
+
+        -- Busca o jogador mais próximo
+        local targetPlayer = GetClosestPlayer()
+        if targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            local targetPos = targetPlayer.Character.HumanoidRootPart.Position
+            local handle = knife:FindFirstChild("Handle")
+            local originPos = handle and handle.Position or char.HumanoidRootPart.Position
+
+            -- Argumento 1: Origem olhando para o alvo
+            local throwCFrame = CFrame.lookAt(originPos, targetPos)
+            -- Argumento 2: Posição do alvo
+            local targetCFrame = CFrame.new(targetPos)
+
+            -- Disparo direto do RemoteEvent
+            knifeThrown:FireServer(throwCFrame, targetCFrame)
+        end
+    end)
+end)
+
+        ThrowButtonGui = ScreenGui
+    else
+        if ThrowButtonGui then
+            ThrowButtonGui:Destroy()
+            ThrowButtonGui = nil
+        end
+    end
+end
+
 ---------------------------------------------------------------------------
 -- [ CRIANDO / DESTRUINDO O BOTÃO SHOOT ]
 ---------------------------------------------------------------------------
@@ -386,7 +512,7 @@ local function ToggleShootButtonGui(enable)
         local ShootButton = Instance.new("TextButton")
         ShootButton.Name = "ShootButton"
         ShootButton.Size = UDim2.new(0, 150, 0, 70)
-        ShootButton.Position = UDim2.new(0.75, 0, 0.5, -40)
+        ShootButton.Position = UDim2.new(0.75, 0, 0.5, -10)
         ShootButton.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
         ShootButton.BackgroundTransparency = 0.5
         ShootButton.Text = "SHOOT"
@@ -1161,12 +1287,41 @@ end)
 ---------------------------------------------------------------------------
 -- [ TABS E INTERFACES ]
 ---------------------------------------------------------------------------
-CombatTab:Toggle({Title = "Aimbot", Default = false, Callback = function(v) AimbotEnabled = v end})
-CombatTab:Toggle({Title = "Mostrar FOV", Default = false, Callback = function(v) FovVisible = v end})
-CombatTab:Slider({Title = "FOV", Step = 1, Value = { Min = 50, Max = 500, Default = 100 }, Callback = function(v) FovSize = v end})
-CombatTab:Toggle({Title = "Anti Fling", Default = false, Callback = function(v) AntiFlingEnabled = v end})
+CombatTab:Toggle({
+    Title = "Aimbot", 
+    Default = false, 
+    Callback = function(v) 
+        AimbotEnabled = v 
+    end
+})
 
--- [ KILL AURA ADICIONADA AQUI ]
+CombatTab:Toggle({
+    Title = "Mostrar FOV", 
+    Default = false, 
+    Callback = function(v) 
+        FovVisible = v 
+    end
+})
+
+CombatTab:Slider({
+    Title = "FOV", 
+    Min = 50, 
+    Max = 500, 
+    Default = 100, 
+    Step = 1, 
+    Callback = function(v) 
+        FovSize = v 
+    end
+})
+
+CombatTab:Toggle({
+    Title = "Anti Fling", 
+    Default = false, 
+    Callback = function(v) 
+        AntiFlingEnabled = v 
+    end
+})
+
 CombatTab:Toggle({
     Title = "Knife aura", 
     Default = false, 
@@ -1175,7 +1330,21 @@ CombatTab:Toggle({
     end
 })
 
-CombatTab:Toggle({Title = "Shoot button", Default = false, Callback = function(v) ToggleShootButtonGui(v) end})
+CombatTab:Toggle({
+    Title = "Throw Knife Button", 
+    Default = false, 
+    Callback = function(v) 
+        ToggleThrowButtonGui(v) 
+    end
+})
+
+CombatTab:Toggle({
+    Title = "Shoot button", 
+    Default = false, 
+    Callback = function(v) 
+        ToggleShootButtonGui(v) 
+    end
+})
 
 FlingTab:Button({
     Title = "Fling murderer",
