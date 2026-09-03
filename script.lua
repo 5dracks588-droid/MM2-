@@ -512,7 +512,7 @@ local function ToggleShootButtonGui(enable)
         local ShootButton = Instance.new("TextButton")
         ShootButton.Name = "ShootButton"
         ShootButton.Size = UDim2.new(0, 150, 0, 70)
-        ShootButton.Position = UDim2.new(0.75, 0, 0.5, -10)
+        ShootButton.Position = UDim2.new(0.75, 0, 0.5, 0)
         ShootButton.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
         ShootButton.BackgroundTransparency = 0.5
         ShootButton.Text = "SHOOT"
