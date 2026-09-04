@@ -512,7 +512,7 @@ local function ToggleShootButtonGui(enable)
         local ShootButton = Instance.new("TextButton")
         ShootButton.Name = "ShootButton"
         ShootButton.Size = UDim2.new(0, 150, 0, 70)
-        ShootButton.Position = UDim2.new(0.75, 0, 0.5, 0)
+        ShootButton.Position = UDim2.new(0.75, 0, 0.5, 5)
         ShootButton.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
         ShootButton.BackgroundTransparency = 0.5
         ShootButton.Text = "SHOOT"
@@ -566,29 +566,6 @@ local function ToggleShootButtonGui(enable)
                     gunInBackpack.Parent = Character
                     gunInChar = gunInBackpack
                 end
-
-                -- 2. Sistema de puxar/congelar (mantido do seu script)
-                task.spawn(function()
-                    local murderer = GetMurdererPlayer()
-                    if murderer and murderer.Character then
-                        local murdHRP = murderer.Character:FindFirstChild("HumanoidRootPart")
-                        local myHRP = Character:FindFirstChild("HumanoidRootPart")
-                        
-                        if murdHRP and myHRP then
-                            local distancia = (myHRP.Position - murdHRP.Position).Magnitude
-                            if distancia <= 20 then
-                                local originalAnchored = murdHRP.Anchored
-                                murdHRP.CFrame = cachedTargetCFrame
-                                murdHRP.AssemblyLinearVelocity = Vector3.zero
-                                murdHRP.Anchored = true
-                                task.wait(0.1)
-                                if murdHRP then
-                                    murdHRP.Anchored = originalAnchored
-                                end
-                            end
-                        end
-                    end
-                end)
 
                 -- 3. Dispara o RemoteEvent direto para o Murderer
                 if gunInChar then
