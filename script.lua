@@ -1460,7 +1460,7 @@ end
 TeleportTab:Button({
     Title = "TP Lobby",
     Callback = function()
-        TeleportToCFrame(CFrame.new(14, 504, -4))
+        TeleportToCFrame(CFrame.new(14, 506, -4))
     end
 })
 
