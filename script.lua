@@ -1108,9 +1108,13 @@ local function ExecutarMecanismoFling(TargetPlayer)
             for _, track in ipairs(animator:GetPlayingAnimationTracks()) do track:Stop() end
         end
         
-        local FPos = function(BasePart, Pos, Ang)
-            root.CFrame = CFrame.new(BasePart.Position) * Pos * Ang
-            char:SetPrimaryPartCFrame(CFrame.new(BasePart.Position) * Pos * Ang)
+                local FPos = function(BasePart, Pos, Ang)
+            -- Adiciona 2 studs no eixo Y (para cima) da posição do alvo
+            local posicaoAcima = BasePart.Position + Vector3.new(0, 2, 0)
+            
+            root.CFrame = CFrame.new(posicaoAcima) * Pos * Ang
+            char:SetPrimaryPartCFrame(CFrame.new(posicaoAcima) * Pos * Ang)
+            
             root.Velocity = Vector3.new(9e7, 9e7 * 10, 9e7)
             root.RotVelocity = Vector3.new(9e8, 9e8, 9e8)
         end
@@ -1437,7 +1441,7 @@ end
 TeleportTab:Button({
     Title = "TP Lobby",
     Callback = function()
-        TeleportToCFrame(CFrame.new(14, 506, -4))
+        TeleportToCFrame(CFrame.new(14, 504, -4))
     end
 })
 
