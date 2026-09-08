@@ -1493,8 +1493,8 @@ TeleportTab:Button({
         -- 3. Teleporta para um dos spawns válidos encontrados
         if #validSpawns > 0 then 
             local randomSpawn = validSpawns[math.random(1, #validSpawns)]
-            -- O "+ CFrame.new(0, 4, 0)" garante que você caia em cima do bloco, e não dentro do chão
-            TeleportToCFrame(randomSpawn.CFrame * CFrame.new(0, 4, 0)) 
+            -- O "+ CFrame.new(0, 5, 0)" garante que você caia em cima do bloco, e não dentro do chão
+            TeleportToCFrame(randomSpawn.CFrame * CFrame.new(0, 5, 0)) 
         else
             -- Se imprimir isso no F9, significa que a partida ainda não começou ou o mapa ainda não carregou
             print("Nenhum spawn de arena encontrado! A partida já começou?")
