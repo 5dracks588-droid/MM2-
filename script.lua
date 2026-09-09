@@ -277,7 +277,7 @@ task.spawn(function()
 end)
 
 ---------------------------------------------------------------------------
--- [ PREDIÇÃO 3D AVANÇADA PARA O SHOOT BUTTON ]
+-- [ PREDIÇÃO 3D APENAS HORIZONTAL (EIXO Y ZERADO) ]
 ---------------------------------------------------------------------------
 local function GetPredictedCFrame(targetChar)
     if not targetChar then return nil end
@@ -299,20 +299,16 @@ local function GetPredictedCFrame(targetChar)
     local pingInSeconds = currentPing / 1000
     local totalLatency = pingInSeconds + 0.05
 
-    local predictedVelocity = vel
+    -- Zera o eixo Y da velocidade para calcular apenas X e Z
+    local predictedVelocity = Vector3.new(vel.X, 0, vel.Z)
     if moveDir.Magnitude > 0 then
         local horizSpeed = Vector3.new(vel.X, 0, vel.Z).Magnitude
         if horizSpeed < 1 then horizSpeed = humanoid.WalkSpeed end
         local horizVel = moveDir * horizSpeed
-        predictedVelocity = Vector3.new(horizVel.X, vel.Y, horizVel.Z)
+        predictedVelocity = Vector3.new(horizVel.X, 0, horizVel.Z)
     end
 
     local finalPos = pos + (predictedVelocity * totalLatency)
-    
-    local state = humanoid:GetState()
-    if state == Enum.HumanoidStateType.Jumping or state == Enum.HumanoidStateType.Freefall then
-        finalPos = finalPos + Vector3.new(0, vel.Y * 0.08, 0)
-    end
 
     return CFrame.new(finalPos)
 end
@@ -1565,7 +1561,7 @@ FarmTab:Toggle({
                         if part then
                             local posicaoOriginalArma = part.CFrame
                             part.CFrame = hrp.CFrame
-                            task.wait()
+                            task.wait(2)
                             if part then part.CFrame = posicaoOriginalArma end
                         end
                     end
@@ -1612,7 +1608,7 @@ FarmTab:Toggle({
                             end
                         end
                     end)
-                    task.wait(10)
+                    task.wait(2)
                 end
             end)
         end
