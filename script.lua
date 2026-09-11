@@ -1572,6 +1572,38 @@ FarmTab:Toggle({
     end
 })
 
+-- Variável de controle do Lock Trade
+local LockTradeEnabled = false
+
+FarmTab:Toggle({
+    Title = "Lock Trade",
+    Default = false,
+    Callback = function(v)
+        LockTradeEnabled = v
+        local rs = game:GetService("ReplicatedStorage")
+        
+        if v then
+            -- Inicia um loop para manter as trocas trancadas enquanto estiver ativado
+            task.spawn(function()
+                while LockTradeEnabled do
+                    pcall(function()
+                        -- Desativa os pedidos de troca
+                        rs.Trade.SetRequestsEnabled:FireServer(false)
+                        -- Recusa instantaneamente qualquer troca pendente
+                        rs.Trade.DeclineRequest:FireServer()
+                    end)
+                    task.wait(1) -- Checa a cada 1 segundo
+                end
+            end)
+        else
+            -- Quando desativar o toggle, ele libera as trocas de novo
+            pcall(function()
+                rs.Trade.SetRequestsEnabled:FireServer(true)
+            end)
+        end
+    end
+})
+
 FarmTab:Toggle({
     Title = "Auto prestígio",
     Default = false,
