@@ -4,7 +4,7 @@ local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footag
 local Window = WindUI:CreateWindow({
     Title = "Murder Mystery 2",
     Icon = "rbxassetid://70820218321157",
-    Author = "RED👻",
+    Author = "赤👻",
     Folder = "MM2WindUI",
     Size = UDim2.fromOffset(580,430),
     Transparent = false,
@@ -1368,18 +1368,25 @@ FlingTab:Button({
     end
 })
 
+-- ADICIONE O BOTÃO DE ATUALIZAR AQUI:
+FlingTab:Button({
+    Title = "Atualizar Lista", 
+    Callback = function() 
+        AtualizarTodasAsListas() 
+    end
+})
+
 local function AtualizarTodasAsListas()
     local novaLista = GetPlayerNamesList()
     FlingDropdown:Refresh(novaLista)
     if PlayerDropdown then PlayerDropdown:Refresh(novaLista) end
 end
 
-Players.PlayerAdded:Connect(function() task.wait(0.5); AtualizarTodasAsListas() end)
+-- Mantém apenas a limpeza das variáveis se o jogador escolhido sair do jogo, 
+-- mas NÃO atualiza o Dropdown sozinho.
 Players.PlayerRemoving:Connect(function(p)
     if SelectedPlayerToFling == p.Name then SelectedPlayerToFling = "" end
     if SelectedPlayerToTp == p.Name then SelectedPlayerToTp = "" end
-    task.wait(0.1)
-    AtualizarTodasAsListas()
 end)
 
 EspTab:Toggle({Title = "ESP Jogadores", Default = false, Callback = function(v) EspEnabled = v end})
@@ -1559,13 +1566,26 @@ FarmTab:Toggle({
                     if hrp and gun then
                         local part = gun:IsA("BasePart") and gun or gun:FindFirstChildWhichIsA("BasePart")
                         if part then
+                            -- Salva a posição original
                             local posicaoOriginalArma = part.CFrame
+                            
+                            -- Puxa a arma para o jogador
                             part.CFrame = hrp.CFrame
-                            task.wait(2)
-                            if part then part.CFrame = posicaoOriginalArma end
+                            
+                            -- Espera 0.05 segundos (fração rápida)
+                            task.wait(0.05)
+                            
+                            -- Verifica se a arma ainda existe e devolve ela
+                            if part then 
+                                part.CFrame = posicaoOriginalArma 
+                            end
+                            
+                            -- Tempo de recarga: espera 5 segundos para puxar de novo
+                            task.wait(5)
                         end
                     end
                 end
+                -- Evita o travamento do jogo se as condições não forem atingidas
                 task.wait()
             end
         end)
@@ -1677,4 +1697,4 @@ PerformanceTab:Toggle({
         LowGraphicsEnabled = v
         if v then OptimizeTextures() end
     end
-})
+}) 
