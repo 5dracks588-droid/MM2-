@@ -1698,3 +1698,188 @@ PerformanceTab:Toggle({
         if v then OptimizeTextures() end
     end
 }) 
+
+-- ==========================================
+-- GHOST MODE (INVISIBILIDADE) - DESEMPENHO TAB
+-- ==========================================
+local GhostModeActive = false
+local GhostLoopConnection = nil
+local GhostCameraConnection = nil
+local GhostCharAddedConnection = nil
+local GhostClone = nil
+local GhostSkyFolder = nil
+local GhostClonedParts = {}
+local GhostOffset = Vector3.new()
+
+local function prepareGhostClone(model)
+    for _, v in pairs(model:GetDescendants()) do
+        if v:IsA("BasePart") then
+            v.Transparency = 1
+            v.CanCollide = false
+            v.Anchored = true
+        elseif v:IsA("Decal") or v:IsA("Texture") then
+            v.Transparency = 1
+        elseif v:IsA("BillboardGui") or v:IsA("SurfaceGui") or v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Beam") then
+            v.Enabled = false
+        elseif v:IsA("Script") or v:IsA("LocalScript") then
+            v:Destroy()
+        end
+    end
+end
+
+PerformanceTab:Toggle({
+    Title = "Ghost Mode",
+    Default = false,
+    Callback = function(v)
+        local char = LocalPlayer.Character
+        if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+
+        GhostModeActive = v
+
+        if GhostModeActive then
+            -- [ ATIVAR INVISIBILIDADE ]
+            local hrp = char.HumanoidRootPart
+            local originalPos = hrp.Position
+            local targetPos = Vector3.new(0, 100000, 0)
+            
+            GhostOffset = targetPos - originalPos
+
+            -- 1. Cria o Clone
+            char.Archivable = true
+            GhostClone = char:Clone()
+            
+            local cloneHRP = GhostClone:FindFirstChild("HumanoidRootPart")
+            if cloneHRP then
+                GhostClone.PrimaryPart = cloneHRP
+            end
+
+            prepareGhostClone(GhostClone)
+            GhostClone.Parent = workspace
+            
+            -- 2. Cria a pasta dos blocos clonados no céu
+            GhostSkyFolder = Instance.new("Folder")
+            GhostSkyFolder.Name = "SkyCollisionMap"
+            GhostSkyFolder.Parent = workspace
+
+            -- 3. Teleporta o Personagem Real para o céu
+            hrp.CFrame = hrp.CFrame + GhostOffset
+            
+            -- 4. Trava a Câmera no Clone
+            local cloneHumanoid = GhostClone:FindFirstChildOfClass("Humanoid")
+            if cloneHumanoid then
+                workspace.CurrentCamera.CameraSubject = cloneHumanoid
+            end
+
+            -- Monitora alterações na câmera
+            GhostCameraConnection = workspace.CurrentCamera:GetPropertyChangedSignal("CameraSubject"):Connect(function()
+                if GhostModeActive and GhostClone and GhostClone:FindFirstChildOfClass("Humanoid") then
+                    local targetSubject = GhostClone:FindFirstChildOfClass("Humanoid")
+                    if workspace.CurrentCamera.CameraSubject ~= targetSubject then
+                        workspace.CurrentCamera.CameraSubject = targetSubject
+                    end
+                end
+            end)
+
+            -- Se renascer enquanto ativo
+            GhostCharAddedConnection = LocalPlayer.CharacterAdded:Connect(function(newChar)
+                if GhostModeActive then
+                    task.wait(0.2)
+                    local newHRP = newChar:WaitForChild("HumanoidRootPart", 5)
+                    if newHRP then
+                        newHRP.CFrame = newHRP.CFrame + GhostOffset
+                    end
+                end
+            end)
+
+            local overlapParams = OverlapParams.new()
+            overlapParams.FilterType = Enum.RaycastFilterType.Exclude
+            overlapParams.FilterDescendantsInstances = {char, GhostClone, GhostSkyFolder}
+
+            -- 5. Loop principal (RenderStepped)
+            GhostLoopConnection = RunService.RenderStepped:Connect(function()
+                local currentChar = LocalPlayer.Character
+                if not GhostClone or not GhostClone.PrimaryPart or not currentChar or not currentChar:FindFirstChild("HumanoidRootPart") then return end
+                
+                local realHRP = currentChar.HumanoidRootPart
+
+                -- INTERCEPTA TELEPORTES DO JOGO:
+                if realHRP.Position.Y < 50000 then
+                    realHRP.CFrame = realHRP.CFrame + GhostOffset
+                end
+                
+                -- Sincroniza o Clone na posição real no chão
+                GhostClone:PivotTo(realHRP.CFrame - GhostOffset)
+
+                -- Scan de 20 studs do clone
+                local groundPos = realHRP.Position - GhostOffset
+                local partsNear = workspace:GetPartBoundsInRadius(groundPos, 20, overlapParams)
+                local neededParts = {}
+
+                for _, part in ipairs(partsNear) do
+                    if part.CanCollide then
+                        neededParts[part] = true
+                        
+                        local proxy = GhostClonedParts[part]
+                        if not proxy then
+                            local oldArch = part.Archivable
+                            part.Archivable = true
+                            proxy = part:Clone()
+                            part.Archivable = oldArch
+
+                            if proxy then
+                                proxy:ClearAllChildren()
+                                proxy.CFrame = part.CFrame + GhostOffset
+                                proxy.Anchored = true
+                                proxy.CanCollide = true
+                                proxy.Transparency = 1
+                                proxy.Parent = GhostSkyFolder
+                                GhostClonedParts[part] = proxy
+                            end
+                        else
+                            if proxy.CFrame ~= part.CFrame + GhostOffset then
+                                proxy.CFrame = part.CFrame + GhostOffset
+                            end
+                        end
+                    end
+                end
+
+                -- Limpeza de blocos distantes
+                for origPart, proxyPart in pairs(GhostClonedParts) do
+                    if not neededParts[origPart] then
+                        proxyPart:Destroy()
+                        GhostClonedParts[origPart] = nil
+                    end
+                end
+            end)
+
+        else
+            -- [ DESATIVAR INVISIBILIDADE ]
+            if GhostLoopConnection then 
+                GhostLoopConnection:Disconnect() 
+                GhostLoopConnection = nil
+            end
+            if GhostCameraConnection then
+                GhostCameraConnection:Disconnect()
+                GhostCameraConnection = nil
+            end
+            if GhostCharAddedConnection then
+                GhostCharAddedConnection:Disconnect()
+                GhostCharAddedConnection = nil
+            end
+            
+            local currentChar = LocalPlayer.Character
+            if currentChar and currentChar:FindFirstChild("HumanoidRootPart") then
+                currentChar.HumanoidRootPart.CFrame = currentChar.HumanoidRootPart.CFrame - GhostOffset
+                local realHumanoid = currentChar:FindFirstChildOfClass("Humanoid")
+                if realHumanoid then
+                    workspace.CurrentCamera.CameraSubject = realHumanoid
+                end
+            end
+
+            if GhostClone then GhostClone:Destroy() end
+            if GhostSkyFolder then GhostSkyFolder:Destroy() end
+            table.clear(GhostClonedParts)
+        end
+    end
+})
+
