@@ -1688,7 +1688,7 @@ PlayerTab:Input({
 PlayerTab:Toggle({Title = "Pulo Infinito", Default = false, Callback = function(v) InfiniteJump = v end})
 PlayerTab:Toggle({Title = "NoClip", Default = false, Callback = function(v) NoclipEnabled = v end})
 PlayerTab:Toggle({Title = "Fly", Default = false, Callback = function(v) if v then StartFly() else StopFly() end end})
-PlayerTab:Slider({Title = "Fly Speed", Step = 5, Value = {Min = 10, Max = 500, Default = 50}, Callback = function(v) FlySpeed = v end})
+PlayerTab:Slider({Title = "Fly Speed", Step = 5, Value = {Min = 10, Max = 250, Default = 50}, Callback = function(v) FlySpeed = v end})
 
 PerformanceTab:Toggle({
     Title = "Modo Leve",
@@ -1759,7 +1759,7 @@ PerformanceTab:Toggle({
         if ghostModeActive then
             local hrp = char.HumanoidRootPart
             local originalPos = hrp.Position
-            local targetPos = Vector3.new(1000, 500, 1000)
+            local targetPos = Vector3.new(0, 100000, 0)
             
             ghostOffset = targetPos - originalPos
 
