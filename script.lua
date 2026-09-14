@@ -278,46 +278,27 @@ task.spawn(function()
 end)
 
 ---------------------------------------------------------------------------
--- [ PREDIÇÃO 3D APENAS HORIZONTAL (EIXO Y ZERADO) ]
+-- [ POSIÇÃO DIRETA DO MURDERER (SEM PREDIÇÃO DE PING) ]
 ---------------------------------------------------------------------------
 local function GetPredictedCFrame(targetChar)
     if not targetChar then return nil end
     
-    local targetPart = targetChar:FindFirstChild("HumanoidRootPart") or targetChar:FindFirstChild("LowerTorso") or targetChar:FindFirstChild("Torso")
+    local targetPart = targetChar:FindFirstChild("HumanoidRootPart") 
+        or targetChar:FindFirstChild("UpperTorso") 
+        or targetChar:FindFirstChild("Torso")
     local humanoid = targetChar:FindFirstChildOfClass("Humanoid")
     
-    if not targetPart or not humanoid then return nil end
-
-    local pos = targetPart.Position
-    local moveDir = humanoid.MoveDirection
-    local vel = targetPart.AssemblyLinearVelocity
-
-    local currentPing = 80
-    pcall(function()
-        currentPing = Stats.Network.ServerStatsItem["Data Ping"]:GetValue()
-    end)
-
-    local pingInSeconds = currentPing / 1000
-    local totalLatency = pingInSeconds + 0.05
-
-    -- Zera o eixo Y da velocidade para calcular apenas X e Z
-    local predictedVelocity = Vector3.new(vel.X, 0, vel.Z)
-    if moveDir.Magnitude > 0 then
-        local horizSpeed = Vector3.new(vel.X, 0, vel.Z).Magnitude
-        if horizSpeed < 1 then horizSpeed = humanoid.WalkSpeed end
-        local horizVel = moveDir * horizSpeed
-        predictedVelocity = Vector3.new(horizVel.X, 0, horizVel.Z)
+    if targetPart and humanoid and humanoid.Health > 0 then
+        return targetPart.CFrame
     end
 
-    local finalPos = pos + (predictedVelocity * totalLatency)
-
-    return CFrame.new(finalPos)
+    return nil
 end
 
 task.spawn(function()
     while true do
         local murderer = GetMurdererPlayer()
-        if murderer and murderer.Character and murderer.Character:FindFirstChildOfClass("Humanoid") and murderer.Character:FindFirstChildOfClass("Humanoid").Health > 0 then
+        if murderer and murderer.Character then
             cachedTargetCFrame = GetPredictedCFrame(murderer.Character)
         else
             cachedTargetCFrame = nil
