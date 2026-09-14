@@ -1706,16 +1706,17 @@ PerformanceTab:Toggle({
 }) 
 
 -- ==========================================
--- GHOST MODE (MAPA OTIMIZADO + SYNC INSTANTÂNEO)
+-- GHOST MODE (MAPA OTIMIZADO + SYNC INSTANTÂNEO + AUTO-DESATIVAR AO MORRER)
 -- ==========================================
 local ghostModeActive = false
 local ghostMapLoop = nil
 local ghostCamConn = nil
 local ghostCharConn = nil
+local ghostDiedConn = nil
 local ghostClone = nil
 local ghostSkyFolder = nil
 local ghostClonedParts = {}
-local ghostOffset = Vector3.new()
+local ghostOffset = Vector3.new(10000, 1000, 10000)
 
 local function prepareGhostClone(model)
     for _, v in pairs(model:GetDescendants()) do
@@ -1726,13 +1727,14 @@ local function prepareGhostClone(model)
 
     for _, v in pairs(model:GetDescendants()) do
         if v:IsA("BasePart") then
+            v.CanCollide = false
+            v.Anchored = true
             if v.Name == "HumanoidRootPart" or v.Name == "CollisionBox" then
                 v.Transparency = 1
             else
                 v.Transparency = 0.5
+                v.LocalTransparencyModifier = 0
             end
-            v.CanCollide = false
-            v.Anchored = true
         elseif v:IsA("Decal") or v:IsA("Texture") then
             v.Transparency = 0.5
         elseif v:IsA("BillboardGui") or v:IsA("SurfaceGui") or v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Beam") then
@@ -1753,7 +1755,8 @@ local function syncCloneAnimationsExact(realModel, cloneModel, offset)
     end
 end
 
-PerformanceTab:Toggle({
+local ghostToggle
+ghostToggle = PerformanceTab:Toggle({
     Title = "Ghost Mode",
     Default = false,
     Callback = function(state)
@@ -1764,10 +1767,22 @@ PerformanceTab:Toggle({
 
         if ghostModeActive then
             local hrp = char.HumanoidRootPart
-            local originalPos = hrp.Position
-            local targetPos = Vector3.new(0, 100000, 0)
-            
-            ghostOffset = targetPos - originalPos
+            local humanoid = char:FindFirstChildOfClass("Humanoid")
+            ghostOffset = Vector3.new(10000, 1000, 10000)
+
+            -- Detecta quando o personagem morre e desativa o toggle automaticamente
+            if humanoid then
+                ghostDiedConn = humanoid.Died:Connect(function()
+                    if ghostToggle and typeof(ghostToggle.SetValue) == "function" then
+                        ghostToggle:SetValue(false)
+                    elseif ghostToggle and typeof(ghostToggle.Set) == "function" then
+                        ghostToggle:Set(false)
+                    else
+                        -- Caso a UI lib use atualização direta pelo callback
+                        ghostToggle.Callback(false)
+                    end
+                end)
+            end
 
             char.Archivable = true
             ghostClone = char:Clone()
@@ -1815,12 +1830,28 @@ PerformanceTab:Toggle({
                 if not ghostClone or not currentChar or not currentChar:FindFirstChild("HumanoidRootPart") then return end
                 
                 local realHRP = currentChar.HumanoidRootPart
+                local cloneHRP = ghostClone:FindFirstChild("HumanoidRootPart")
 
-                if realHRP.Position.Y < 50000 then
-                    realHRP.CFrame = realHRP.CFrame + ghostOffset
+                if cloneHRP then
+                    local expectedRealPos = cloneHRP.Position + ghostOffset
+                    -- Se o jogo teleportar o personagem real
+                    if (realHRP.Position - expectedRealPos).Magnitude > 15 then
+                        realHRP.CFrame = realHRP.CFrame + ghostOffset
+                    end
                 end
                 
+                -- Sincroniza visual/animações do clone
                 syncCloneAnimationsExact(currentChar, ghostClone, ghostOffset)
+
+                -- Garante transparência 0.5 sem esconder a cabeça
+                for _, part in ipairs(ghostClone:GetDescendants()) do
+                    if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" and part.Name ~= "CollisionBox" then
+                        part.LocalTransparencyModifier = 0
+                        part.Transparency = 0.5
+                    elseif part:IsA("Decal") or part:IsA("Texture") then
+                        part.Transparency = 0.5
+                    end
+                end
             end)
 
             local lastTick = 0
@@ -1872,10 +1903,12 @@ PerformanceTab:Toggle({
                 end
             end)
         else
+            -- Limpeza dos eventos e conexões
             RunService:UnbindFromRenderStep("GhostSyncVisual")
             if ghostMapLoop then ghostMapLoop:Disconnect() ghostMapLoop = nil end
             if ghostCamConn then ghostCamConn:Disconnect() ghostCamConn = nil end
             if ghostCharConn then ghostCharConn:Disconnect() ghostCharConn = nil end
+            if ghostDiedConn then ghostDiedConn:Disconnect() ghostDiedConn = nil end
             
             local currentChar = LocalPlayer.Character
             if currentChar and currentChar:FindFirstChild("HumanoidRootPart") then
