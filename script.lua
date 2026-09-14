@@ -4,7 +4,7 @@ local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footag
 local Window = WindUI:CreateWindow({
     Title = "Murder Mystery 2",
     Icon = "rbxassetid://70820218321157",
-    Author = "赤👻",
+    Author = "赤👻", 
     Folder = "MM2WindUI",
     Size = UDim2.fromOffset(580,430),
     Transparent = false,
@@ -41,11 +41,12 @@ Window:EditOpenButton({
     Title = "Open Menu",
     Icon = "rbxassetid://70820218321157",
     CornerRadius = UDim.new(0.5, 0),
-    StrokeThickness = 2,
-    Color = ColorSequence.new(
-        Color3.fromHex("000000"),
-        Color3.fromHex("#282828")
-    ),
+    StrokeThickness = 3, 
+    Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 0, 0)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(150, 150, 150)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 0, 0))
+    }),
     OnlyMobile = false,
     Enabled = true,
     Draggable = true,
@@ -1104,41 +1105,67 @@ local function ExecutarMecanismoFling(TargetPlayer)
             for _, track in ipairs(animator:GetPlayingAnimationTracks()) do track:Stop() end
         end
         
-                local FPos = function(BasePart, Pos, Ang)
-            -- Adiciona 2 studs no eixo Y (para cima) da posição do alvo
-            local posicaoAcima = BasePart.Position + Vector3.new(0, 2, 0)
+        -- FUNÇÃO DE POSIÇÃO E ROTAÇÃO
+        local FPos = function(targetPosition, rotationAngle)
+            -- 2 studs acima
+            local posicaoFinal = targetPosition + Vector3.new(0, 2, 0)
             
-            root.CFrame = CFrame.new(posicaoAcima) * Pos * Ang
-            char:SetPrimaryPartCFrame(CFrame.new(posicaoAcima) * Pos * Ang)
+            -- Mortal pra frente no eixo X
+            local finalCFrame = CFrame.new(posicaoFinal) * CFrame.Angles(math.rad(rotationAngle), 0, 0)
             
-            root.Velocity = Vector3.new(9e7, 9e7 * 10, 9e7)
-            root.RotVelocity = Vector3.new(9e8, 9e8, 9e8)
+            root.CFrame = finalCFrame
+            if char.PrimaryPart then
+                char:SetPrimaryPartCFrame(finalCFrame)
+            end
+            
+            -- Velocidade forçando pra baixo
+            root.Velocity = Vector3.new(50000, -50000, 50000)
+            root.RotVelocity = Vector3.new(50000, 50000, 50000)
         end
         
+        -- SISTEMA: Focado se parado / Vai e Vem se andando + Mortal
         local SFBasePart = function(BasePart)
             local TimeToWait = 5
             local Time = tick()
-            local Angle = 0
-            local distance = 10
-            local speed = 200
+            local distance = 15
+            local speed = 50
             local progress = 0
             local movingForward = true
+            local currentAngle = 0
             
             repeat
-                if root and tHum and tRoot then
-                    if tRoot.AssemblyLinearVelocity.Magnitude > 150 then break end
-                    Angle = (Angle + 45) % 360
+                if root and BasePart and BasePart.Parent then
+                    if BasePart.AssemblyLinearVelocity.Magnitude > 250 then break end
                     local dt = task.wait()
                     
-                    local moveDir = tHum.MoveDirection
-                    local offsetCFrame = CFrame.new(0, 0, 0)
+                    -- Adiciona a rotação (Mortal)
+                    currentAngle = (currentAngle + 45) % 360
                     
-                    if moveDir.Magnitude < 0.1 then
-                        offsetCFrame = CFrame.new(0, 0, 0)
+                    local targetPosition
+                    local isMoving = false
+                    
+                    -- Checa se o alvo está andando/tentando se mover
+                    if tHum and tHum.MoveDirection.Magnitude > 0.1 then
+                        isMoving = true
+                    elseif not tHum and BasePart.AssemblyLinearVelocity.Magnitude > 1 then
+                        isMoving = true
+                    end
+                    
+                    if not isMoving then
+                        -- ALVO PARADO: Trava na posição exata dele (sem ir pra frente/trás)
+                        targetPosition = BasePart.Position
+                        progress = 0 -- Reseta a distância para que, ao andar, recomece do zero
+                        movingForward = true
                     else
-                        local flatDir = Vector3.new(moveDir.X, 0, moveDir.Z).Unit
-                        local localDir = tRoot.CFrame:VectorToObjectSpace(flatDir)
+                        -- ALVO ANDANDO: Retoma o sistema de ir 15 studs pra frente e pra trás
+                        local dir = Vector3.zero
+                        if tHum then
+                            dir = Vector3.new(tHum.MoveDirection.X, 0, tHum.MoveDirection.Z).Unit
+                        else
+                            dir = Vector3.new(BasePart.AssemblyLinearVelocity.X, 0, BasePart.AssemblyLinearVelocity.Z).Unit
+                        end
                         
+                        -- Lógica de Vai e Vem
                         if movingForward then
                             progress = progress + (speed * dt)
                             if progress >= distance then
@@ -1147,21 +1174,21 @@ local function ExecutarMecanismoFling(TargetPlayer)
                             end
                         else
                             progress = progress - (speed * dt)
-                            if progress <= -distance then
-                                progress = -distance
+                            if progress <= 0 then
+                                progress = 0
                                 movingForward = true
                             end
                         end
                         
-                        local sideOffset = math.sin(tick() * 10) * 10
-                        offsetCFrame = CFrame.new(localDir * progress) * CFrame.new(sideOffset, 0, 0)
+                        -- Aplica o offset do vai e vem
+                        targetPosition = BasePart.Position + (dir * progress)
                     end
                     
-                    FPos(BasePart, offsetCFrame, CFrame.Angles(math.rad(Angle), 0, 0))
+                    FPos(targetPosition, currentAngle)
                 else
                     break
                 end
-            until Time + TimeToWait < tick() or not FlingActive
+            until tick() > Time + TimeToWait or not FlingActive
         end
         
         workspace.FallenPartsDestroyHeight = 0/0
@@ -1282,10 +1309,8 @@ CombatTab:Toggle({
 
 CombatTab:Slider({
     Title = "FOV", 
-    Min = 50, 
-    Max = 500, 
-    Default = 100, 
-    Step = 1, 
+    Step = 5, 
+    Value = {Min = 50, Max = 500, Default = 100}, -- Os valores precisam ficar dentro desta tabela!
     Callback = function(v) 
         FovSize = v 
     end
@@ -1685,7 +1710,7 @@ PlayerTab:Input({
     end
 })
 
-PlayerTab:Toggle({Title = "Pulo Infinito", Default = false, Callback = function(v) InfiniteJump = v end})
+PlayerTab:Toggle({Title = "Infinite Jump", Default = false, Callback = function(v) InfiniteJump = v end})
 PlayerTab:Toggle({Title = "NoClip", Default = false, Callback = function(v) NoclipEnabled = v end})
 PlayerTab:Toggle({Title = "Fly", Default = false, Callback = function(v) if v then StartFly() else StopFly() end end})
 PlayerTab:Slider({Title = "Fly Speed", Step = 5, Value = {Min = 10, Max = 250, Default = 50}, Callback = function(v) FlySpeed = v end})
