@@ -278,7 +278,7 @@ task.spawn(function()
 end)
 
 ---------------------------------------------------------------------------
--- [ POSIÇÃO DIRETA DO MURDERER (SEM PREDIÇÃO DE PING) ]
+-- [ PREDIÇÃO 3D BASEADA NO PING ]
 ---------------------------------------------------------------------------
 local function GetPredictedCFrame(targetChar)
     if not targetChar then return nil end
@@ -289,12 +289,45 @@ local function GetPredictedCFrame(targetChar)
     local humanoid = targetChar:FindFirstChildOfClass("Humanoid")
     
     if targetPart and humanoid and humanoid.Health > 0 then
+        -- Tenta capturar o ping atual
+        local ping = 0
+        pcall(function()
+            ping = math.floor(game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue())
+        end)
+
+        -- Pega a velocidade e direção do alvo (ignorando eixo Y)
+        local velocity = targetPart.AssemblyLinearVelocity
+        local horizontalVelocity = Vector3.new(velocity.X, 0, velocity.Z)
+
+        -- Verifica se o alvo está efetivamente andando
+        if horizontalVelocity.Magnitude > 1 then
+            local offsetDistance = 0
+
+            -- Regras de Predição
+            if ping >= 200 then
+                offsetDistance = 5
+            elseif ping >= 110 then
+                offsetDistance = 3
+            elseif ping >= 50 then
+                offsetDistance = 1
+            else
+                offsetDistance = horizontalVelocity.Magnitude * (ping / 1000)
+            end
+
+            local moveDirection = horizontalVelocity.Unit
+            local predictedPos = targetPart.Position + (moveDirection * offsetDistance)
+            
+            return CFrame.new(predictedPos)
+        end
+
+        -- Retorna a posição normal se estiver parado
         return targetPart.CFrame
     end
 
     return nil
 end
 
+-- NÃO APAGUE ESTE LOOP: Ele é responsável por atualizar a mira constantemente
 task.spawn(function()
     while true do
         local murderer = GetMurdererPlayer()
