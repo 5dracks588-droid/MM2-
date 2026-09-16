@@ -4,7 +4,7 @@ local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footag
 local Window = WindUI:CreateWindow({
     Title = "Murder Mystery 2",
     Icon = "rbxassetid://70820218321157",
-    Author = "赤👻", 
+    Author = "赤 👻", 
     Folder = "MM2WindUI",
     Size = UDim2.fromOffset(580,430),
     Transparent = false,
@@ -1663,46 +1663,41 @@ FarmTab:Toggle({
     end
 })
 
-FarmTab:Toggle({
-    Title = "Auto prestígio",
-    Default = false,
-    Callback = function(v)
-        AutoPrestigeEnabled = v
-        if v then
-            task.spawn(function()
-                while AutoPrestigeEnabled do
-                    pcall(function()
-                        local isLevel100 = false
-                        local dataLevel = LocalPlayer:FindFirstChild("Data") and LocalPlayer.Data:FindFirstChild("Level")
-                        local leaderstatsLevel = LocalPlayer:FindFirstChild("leaderstats") and LocalPlayer.leaderstats:FindFirstChild("Level")
-                        
-                        if dataLevel and tonumber(dataLevel.Value) >= 100 then
-                            isLevel100 = true
-                        elseif leaderstatsLevel and tonumber(leaderstatsLevel.Value) >= 100 then
-                            isLevel100 = true
+FarmTab:Button({
+    Title = "Prestígio",
+    Callback = function()
+        pcall(function()
+            local isLevel100 = false
+            local dataLevel = LocalPlayer:FindFirstChild("Data") and LocalPlayer.Data:FindFirstChild("Level")
+            local leaderstatsLevel = LocalPlayer:FindFirstChild("leaderstats") and LocalPlayer.leaderstats:FindFirstChild("Level")
+            
+            if dataLevel and tonumber(dataLevel.Value) >= 100 then
+                isLevel100 = true
+            elseif leaderstatsLevel and tonumber(leaderstatsLevel.Value) >= 100 then
+                isLevel100 = true
+            end
+            
+            if not dataLevel and not leaderstatsLevel then
+                isLevel100 = true 
+            end
+            
+            if isLevel100 then
+                for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
+                    if obj.Name == "Prestige" and (obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction")) then
+                        if obj:IsA("RemoteEvent") then
+                            obj:FireServer()
+                        elseif obj:IsA("RemoteFunction") then
+                            obj:InvokeServer()
                         end
-                        
-                        if not dataLevel and not leaderstatsLevel then
-                            isLevel100 = true 
-                        end
-                        
-                        if isLevel100 then
-                            for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
-                                if obj.Name == "Prestige" and (obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction")) then
-                                    if obj:IsA("RemoteEvent") then
-                                        obj:FireServer()
-                                    elseif obj:IsA("RemoteFunction") then
-                                        obj:InvokeServer()
-                                    end
-                                    break
-                                end
-                            end
-                        end
-                    end)
-                    task.wait(2)
+                        -- Aviso opcional no console (F9)
+                        print("Prestígio ativado com sucesso!")
+                        break
+                    end
                 end
-            end)
-        end
+            else
+                print("Você não tem nível suficiente para essa ação!")
+            end
+        end)
     end
 })
 
@@ -1737,6 +1732,74 @@ PerformanceTab:Toggle({
         if v then OptimizeTextures() end
     end
 }) 
+
+local XRayEnabled = false
+local TransparenciasOriginais = {} -- Guarda o estado original do mapa
+
+PerformanceTab:Toggle({
+    Title = "X-Ray",
+    Default = false,
+    Callback = function(Value)
+        XRayEnabled = Value
+        
+        if XRayEnabled then
+            -- Ativando o X-Ray
+            task.spawn(function()
+                local count = 0
+                for _, obj in ipairs(workspace:GetDescendants()) do
+                    if obj:IsA("BasePart") or obj:IsA("Decal") or obj:IsA("Texture") then
+                        
+                        -- Verifica se a peça pertence ao personagem de algum jogador
+                        local eDeJogador = false
+                        local atual = obj
+                        while atual and atual ~= workspace do
+                            if game.Players:GetPlayerFromCharacter(atual) then
+                                eDeJogador = true
+                                break
+                            end
+                            atual = atual.Parent
+                        end
+                        
+                        -- Se não for jogador e o bloco for totalmente visível (Transparência == 0)
+                        if not eDeJogador and obj.Transparency == 0 then
+                            -- Salva a transparência original
+                            if TransparenciasOriginais[obj] == nil then
+                                TransparenciasOriginais[obj] = obj.Transparency
+                            end
+                            
+                            -- Aplica o X-Ray apenas nesses blocos
+                            obj.Transparency = 0.8
+                        end
+                    end
+                    
+                    -- Pausa rápida a cada 1000 peças processadas para o jogo não travar (anti-lag)
+                    count = count + 1
+                    if count % 1000 == 0 then
+                        task.wait()
+                    end
+                end
+            end)
+        else
+            -- Desativando o X-Ray (Restaurando o mapa)
+            task.spawn(function()
+                local count = 0
+                for obj, transOriginal in pairs(TransparenciasOriginais) do
+                    -- Verifica se a peça ainda existe no mapa antes de alterar
+                    if obj and obj.Parent then
+                        obj.Transparency = transOriginal
+                    end
+                    
+                    count = count + 1
+                    if count % 1000 == 0 then
+                        task.wait()
+                    end
+                end
+                -- Limpa a memória depois de restaurar
+                TransparenciasOriginais = {}
+            end)
+        end
+    end
+})
 
 -- ==========================================
 -- GHOST MODE (MAPA OTIMIZADO + SYNC INSTANTÂNEO + AUTO-DESATIVAR AO MORRER)
@@ -1880,9 +1943,9 @@ ghostToggle = PerformanceTab:Toggle({
                 for _, part in ipairs(ghostClone:GetDescendants()) do
                     if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" and part.Name ~= "CollisionBox" then
                         part.LocalTransparencyModifier = 0
-                        part.Transparency = 0.5
+                        part.Transparency = 0.8
                     elseif part:IsA("Decal") or part:IsA("Texture") then
-                        part.Transparency = 0.5
+                        part.Transparency = 0.8
                     end
                 end
             end)
