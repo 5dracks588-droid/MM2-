@@ -1136,8 +1136,8 @@ local function ExecutarMecanismoFling(TargetPlayer)
         local SFBasePart = function(BasePart)
             local TimeToWait = 5
             local Time = tick()
-            local distance = 15
-            local speed = 50
+            local distance = 20
+            local speed = 100
             local progress = 0
             local movingForward = true
             local currentAngle = 0
