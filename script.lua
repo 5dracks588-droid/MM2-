@@ -278,8 +278,11 @@ task.spawn(function()
 end)
 
 ---------------------------------------------------------------------------
--- [ POSIÇÃO ATUAL (SEM PREDIÇÃO) ]
+-- [ POSIÇÃO REAL SINCRONIZADA COM O PING ]
 ---------------------------------------------------------------------------
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
 local function GetPredictedCFrame(targetChar)
     if not targetChar then return nil end
     
@@ -289,7 +292,27 @@ local function GetPredictedCFrame(targetChar)
     local humanoid = targetChar:FindFirstChildOfClass("Humanoid")
     
     if targetPart and humanoid and humanoid.Health > 0 then
-        -- Retorna a posição exata atual do alvo, ignorando ping e velocidade
+        -- 1. Obtém o seu ping atual com o servidor (retorna em segundos)
+        local ping = LocalPlayer:GetNetworkPing()
+        
+        -- 2. Velocidade estimada do tiro da arma do Sheriff no MM2
+        local bulletSpeed = 250 
+        
+        -- 3. Calcula a distância real entre você e o Murderer
+        local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if myRoot then
+            local distance = (targetPart.Position - myRoot.Position).Magnitude
+            
+            -- 4. O tempo total de atraso é o seu ping + o tempo que a bala leva para chegar lá
+            local timeDelay = ping + (distance / bulletSpeed)
+            
+            -- 5. Corrige a posição exata multiplicando o atraso pelo vetor de movimento real do jogador
+            local realPosition = targetPart.Position + (targetPart.AssemblyLinearVelocity * timeDelay)
+            
+            -- Retorna o CFrame recalculado exatamente onde o corpo dele está no servidor agora
+            return CFrame.new(realPosition)
+        end
+        
         return targetPart.CFrame
     end
 
@@ -305,7 +328,7 @@ task.spawn(function()
         else
             cachedTargetCFrame = nil
         end
-        task.wait() -- O loop roda tão rápido que a posição estará perfeitamente sincronizada quando você clicar
+        task.wait() -- Sincronização em tempo real frame por frame
     end
 end)
 
@@ -568,7 +591,7 @@ local function ToggleShootButtonGui(enable)
         end
         
         -- Guarda a arma após o disparo
-        task.delay(0.01, function()
+        task.delay(0.05, function()
             local currentGun = Character:FindFirstChild("Gun")
             if currentGun then
                 currentGun.Parent = Backpack
