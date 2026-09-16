@@ -278,7 +278,7 @@ task.spawn(function()
 end)
 
 ---------------------------------------------------------------------------
--- [ PREDIÇÃO 3D BASEADA NO PING ]
+-- [ POSIÇÃO ATUAL (SEM PREDIÇÃO) ]
 ---------------------------------------------------------------------------
 local function GetPredictedCFrame(targetChar)
     if not targetChar then return nil end
@@ -289,38 +289,7 @@ local function GetPredictedCFrame(targetChar)
     local humanoid = targetChar:FindFirstChildOfClass("Humanoid")
     
     if targetPart and humanoid and humanoid.Health > 0 then
-        -- Tenta capturar o ping atual
-        local ping = 0
-        pcall(function()
-            ping = math.floor(game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue())
-        end)
-
-        -- Pega a velocidade e direção do alvo (ignorando eixo Y)
-        local velocity = targetPart.AssemblyLinearVelocity
-        local horizontalVelocity = Vector3.new(velocity.X, 0, velocity.Z)
-
-        -- Verifica se o alvo está efetivamente andando
-        if horizontalVelocity.Magnitude > 1 then
-            local offsetDistance = 0
-
-            -- Regras de Predição
-            if ping >= 200 then
-                offsetDistance = 5
-            elseif ping >= 110 then
-                offsetDistance = 3
-            elseif ping >= 50 then
-                offsetDistance = 1
-            else
-                offsetDistance = horizontalVelocity.Magnitude * (ping / 1000)
-            end
-
-            local moveDirection = horizontalVelocity.Unit
-            local predictedPos = targetPart.Position + (moveDirection * offsetDistance)
-            
-            return CFrame.new(predictedPos)
-        end
-
-        -- Retorna a posição normal se estiver parado
+        -- Retorna a posição exata atual do alvo, ignorando ping e velocidade
         return targetPart.CFrame
     end
 
@@ -336,7 +305,7 @@ task.spawn(function()
         else
             cachedTargetCFrame = nil
         end
-        task.wait()
+        task.wait() -- O loop roda tão rápido que a posição estará perfeitamente sincronizada quando você clicar
     end
 end)
 
@@ -565,45 +534,48 @@ local function ToggleShootButtonGui(enable)
         end)
 
  ShootButton.MouseButton1Down:Connect(function()
-            local Character = LocalPlayer.Character
-            local Backpack = LocalPlayer:FindFirstChild("Backpack")
-            
-            if Character and Backpack and cachedTargetCFrame then
-                local gunInBackpack = Backpack:FindFirstChild("Gun")
-                local gunInChar = Character:FindFirstChild("Gun")
-                
-                -- 1. Equipa a arma se ela estiver na mochila
-                if gunInBackpack and not gunInChar then
-                    gunInBackpack.Parent = Character
-                    gunInChar = gunInBackpack
-                end
+    local Character = LocalPlayer.Character
+    local Backpack = LocalPlayer:FindFirstChild("Backpack")
+    
+    -- Busca o Murderer e pega a posição dele APENAS neste momento do clique
+    local murderer = GetMurdererPlayer()
+    local targetCFrame = nil
+    
+    if murderer and murderer.Character then
+        targetCFrame = GetPredictedCFrame(murderer.Character)
+    end
+    
+    if Character and Backpack and targetCFrame then
+        local gunInBackpack = Backpack:FindFirstChild("Gun")
+        local gunInChar = Character:FindFirstChild("Gun")
+        
+        -- Equipa a arma se ela estiver na mochila
+        if gunInBackpack and not gunInChar then
+            gunInBackpack.Parent = Character
+            gunInChar = gunInBackpack
+        end
 
-                -- 3. Dispara o RemoteEvent direto para o Murderer
-                if gunInChar then
-                    local shootEvent = gunInChar:FindFirstChild("Shoot")
-                    local handle = gunInChar:FindFirstChild("Handle")
-                    local myHRP = Character:FindFirstChild("HumanoidRootPart")
-                    
-                    if shootEvent and shootEvent:IsA("RemoteEvent") then
-                        -- Arg 1: Origem (Posição da sua arma ou corpo)
-                        local originPos = handle and handle.CFrame or (myHRP and myHRP.CFrame) or CFrame.new()
-                        -- Arg 2: Destino (A mira preditiva que vai em direção ao Murderer)
-                        local targetPos = cachedTargetCFrame
-                        
-                        -- Fogo direto no servidor, sem precisar clicar
-                        shootEvent:FireServer(originPos, targetPos)
-                    end
-                end
-                
-                -- 4. Guarda a arma rapidamente após o tiro
-                task.delay(0.05, function()
-                    local currentGun = Character:FindFirstChild("Gun")
-                    if currentGun then
-                        currentGun.Parent = Backpack
-                    end
-                end)
+        -- Dispara o tiro diretamente para a posição capturada
+        if gunInChar then
+            local shootEvent = gunInChar:FindFirstChild("Shoot")
+            local handle = gunInChar:FindFirstChild("Handle")
+            local myHRP = Character:FindFirstChild("HumanoidRootPart")
+            
+            if shootEvent and shootEvent:IsA("RemoteEvent") then
+                local originPos = handle and handle.CFrame or (myHRP and myHRP.CFrame) or CFrame.new()
+                shootEvent:FireServer(originPos, targetCFrame)
+            end
+        end
+        
+        -- Guarda a arma após o disparo
+        task.delay(0.01, function()
+            local currentGun = Character:FindFirstChild("Gun")
+            if currentGun then
+                currentGun.Parent = Backpack
             end
         end)
+    end
+end)
 
         ShootButtonGui = ScreenGui
     else
