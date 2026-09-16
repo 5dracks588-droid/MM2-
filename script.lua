@@ -591,7 +591,7 @@ local function ToggleShootButtonGui(enable)
         end
         
         -- Guarda a arma após o disparo
-        task.delay(0.05, function()
+        task.delay(0.01, function()
             local currentGun = Character:FindFirstChild("Gun")
             if currentGun then
                 currentGun.Parent = Backpack
