@@ -278,7 +278,7 @@ task.spawn(function()
 end)
 
 ---------------------------------------------------------------------------
--- [ POSIÇÃO REAL SINCRONIZADA COM O PING ]
+-- [ POSIÇÃO ESTÁVEL NA HITBOX DO SERVIDOR - ANTI ZIGUE-ZAGUE ]
 ---------------------------------------------------------------------------
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
@@ -291,44 +291,47 @@ local function GetPredictedCFrame(targetChar)
         or targetChar:FindFirstChild("Torso")
     local humanoid = targetChar:FindFirstChildOfClass("Humanoid")
     
-    if targetPart and humanoid and humanoid.Health > 0 then
-        -- 1. Obtém o seu ping atual com o servidor (retorna em segundos)
+    if targetPart and humanoid and humanoid.Health > 0 and targetChar:IsDescendantOf(workspace) then
+        -- 1. Pega o atraso exato da sua internet (Ping)
         local ping = LocalPlayer:GetNetworkPing()
+        if ping <= 0 then ping = 0.03 end 
         
-        -- 2. Velocidade estimada do tiro da arma do Sheriff no MM2
-        local bulletSpeed = 250 
+        -- 2. Descobre a direção para onde o Murderer está olhando/andando de verdade
+        -- O MoveDirection é estável e não fica "pula-pula" igual a velocidade física
+        local moveDir = humanoid.MoveDirection
         
-        -- 3. Calcula a distância real entre você e o Murderer
-        local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-        if myRoot then
-            local distance = (targetPart.Position - myRoot.Position).Magnitude
-            
-            -- 4. O tempo total de atraso é o seu ping + o tempo que a bala leva para chegar lá
-            local timeDelay = ping + (distance / bulletSpeed)
-            
-            -- 5. Corrige a posição exata multiplicando o atraso pelo vetor de movimento real do jogador
-            local realPosition = targetPart.Position + (targetPart.AssemblyLinearVelocity * timeDelay)
-            
-            -- Retorna o CFrame recalculado exatamente onde o corpo dele está no servidor agora
-            return CFrame.new(realPosition)
-        end
+        -- 3. Velocidade padrão de caminhada no MM2 (16 studs por segundo)
+        local walkSpeed = humanoid.WalkSpeed > 0 and humanoid.WalkSpeed or 16
         
-        return targetPart.CFrame
+        -- 4. O tiro calcula apenas a distância fixa que ele andou no tempo do seu ping
+        -- Isola o cálculo para o tiro não ir para cima nem para baixo do chão
+        local serverOffset = moveDir * (walkSpeed * ping)
+        local realPosition = targetPart.Position + Vector3.new(serverOffset.X, 0, serverOffset.Z)
+        
+        -- Retorna o CFrame firme focado no corpo dele no servidor
+        return CFrame.new(realPosition, realPosition + targetPart.CFrame.LookVector)
     end
 
     return nil
 end
 
--- NÃO APAGUE ESTE LOOP: Ele é responsável por atualizar a mira constantemente
+-- NÃO APAGUE ESTE LOOP: Atualização firme frame por frame
 task.spawn(function()
     while true do
         local murderer = GetMurdererPlayer()
-        if murderer and murderer.Character then
-            cachedTargetCFrame = GetPredictedCFrame(murderer.Character)
+        
+        if murderer and murderer.Character and murderer.Character:FindFirstChildOfClass("Humanoid") then
+            local humanoid = murderer.Character:FindFirstChildOfClass("Humanoid")
+            
+            if humanoid.Health > 0 and murderer.Character:IsDescendantOf(workspace) then
+                cachedTargetCFrame = GetPredictedCFrame(murderer.Character)
+            else
+                cachedTargetCFrame = nil
+            end
         else
             cachedTargetCFrame = nil
         end
-        task.wait() -- Sincronização em tempo real frame por frame
+        task.wait(0.01)
     end
 end)
 
@@ -1422,6 +1425,83 @@ Players.PlayerRemoving:Connect(function(p)
     if SelectedPlayerToFling == p.Name then SelectedPlayerToFling = "" end
     if SelectedPlayerToTp == p.Name then SelectedPlayerToTp = "" end
 end)
+
+FlingTab:Toggle({
+    Title = "Touch fling",
+    Callback = function(State)
+        getgenv().TouchFlingActive = State
+        
+        local Players = game:GetService("Players")
+        local LocalPlayer = Players.LocalPlayer
+        
+        if getgenv().TouchFlingActive then
+            -- Configuração para não morrer por bugs físicos do mapa
+            if workspace.FallenPartsDestroyHeight then
+                getgenv().FPDH = workspace.FallenPartsDestroyHeight
+                workspace.FallenPartsDestroyHeight = 0/0
+            end
+
+            task.spawn(function()
+                -- Cria a parte invisível totalmente SOLTA (Sem Welds) no Workspace
+                local flingPart = Instance.new("Part")
+                flingPart.Name = "FlingHitbox_Safe"
+                flingPart.Size = Vector3.new(6, 6, 6) -- Tamanho do escudo invisível de Fling ao seu redor
+                flingPart.Transparency = 1 -- Totalmente invisível
+                flingPart.CanCollide = false -- Não prende você nem colide com paredes
+                flingPart.Anchored = true -- Ancorada para a velocidade não empurrar você
+                flingPart.Parent = workspace
+
+                -- EVENTO DE TOQUE DA HITBOX: Só afeta os outros jogadores
+                flingPart.Touched:Connect(function(hit)
+                    if not getgenv().TouchFlingActive then return end
+                    
+                    local character = hit.Parent
+                    local targetPlayer = Players:GetPlayerFromCharacter(character)
+                    
+                    -- Se a parte tocada for de outro jogador (e não sua)
+                    if targetPlayer and targetPlayer ~= LocalPlayer then
+                        local targetRoot = character:FindFirstChild("HumanoidRootPart")
+                        if targetRoot then
+                            -- Injeta a velocidade monstruosa instantaneamente direto no ALVO
+                            targetRoot.Velocity = Vector3.new(99999, 99999, 99999)
+                            targetRoot.RotVelocity = Vector3.new(99999, 99999, 99999)
+                        end
+                    end
+                end)
+
+                -- LOOP DE RASTREAMENTO: Segue você perfeitamente sem te dar tontura
+                while getgenv().TouchFlingActive and flingPart and flingPart.Parent do
+                    local char = LocalPlayer.Character
+                    local root = char and char:FindFirstChild("HumanoidRootPart")
+                    local hum = char and char:FindFirstChildOfClass("Humanoid")
+                    
+                    if root and hum and hum.Health > 0 then
+                        -- Mantém a caixa invisível centralizada na sua posição em tempo real
+                        flingPart.CFrame = root.CFrame
+                    else
+                        -- Se você morrer, remove a caixa antiga para não bugar
+                        flingPart:Destroy()
+                        break
+                    end
+                    task.wait() -- Sincronização frame por frame
+                end
+                
+                -- Limpeza de segurança caso saia do loop principal
+                if flingPart then flingPart:Destroy() end
+            end)
+        else
+            -- ==========================================
+            -- CÓDIGO DE DESATIVAÇÃO (Limpa ao desligar o Toggle)
+            -- ==========================================
+            local existingBox = workspace:FindFirstChild("FlingHitbox_Safe")
+            if existingBox then existingBox:Destroy() end
+            
+            if getgenv().FPDH then
+                workspace.FallenPartsDestroyHeight = getgenv().FPDH
+            end
+        end
+    end
+})
 
 EspTab:Toggle({Title = "ESP Jogadores", Default = false, Callback = function(v) EspEnabled = v end})
 EspTab:Toggle({Title = "ESP Arma", Default = false, Callback = function(v) GunEspEnabled = v end})
