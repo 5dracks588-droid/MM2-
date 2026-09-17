@@ -1407,7 +1407,7 @@ FlingTab:Button({
 
 -- ADICIONE O BOTÃO DE ATUALIZAR AQUI:
 FlingTab:Button({
-    Title = "Atualizar Lista", 
+    Title = "Update list", 
     Callback = function() 
         AtualizarTodasAsListas() 
     end
@@ -1426,8 +1426,55 @@ Players.PlayerRemoving:Connect(function(p)
     if SelectedPlayerToTp == p.Name then SelectedPlayerToTp = "" end
 end)
 
-EspTab:Toggle({Title = "ESP Jogadores", Default = false, Callback = function(v) EspEnabled = v end})
-EspTab:Toggle({Title = "ESP Arma", Default = false, Callback = function(v) GunEspEnabled = v end})
+EspTab:Toggle({Title = "ESP Players", Default = false, Callback = function(v) EspEnabled = v end})
+EspTab:Toggle({Title = "ESP Gun", Default = false, Callback = function(v) GunEspEnabled = v end})
+
+local coinConnection = nil
+
+EspTab:Toggle({
+    Title = "ESP Coins", 
+    Default = false, 
+    Callback = function(enabled)
+        if enabled then
+            if coinConnection then coinConnection:Disconnect() end
+            
+            coinConnection = game:GetService("RunService").RenderStepped:Connect(function()
+                local areaDeBusca = workspace:FindFirstChild("NormalMaps") or workspace:FindFirstChild("Map") or workspace
+
+                for _, obj in ipairs(areaDeBusca:GetDescendants()) do
+                    if obj:IsA("BasePart") then
+                        local nome = string.lower(obj.Name)
+                        if (nome:find("coin") or nome:find("gold") or nome:find("token")) and obj.Transparency < 1 then
+                            local highlight = obj:FindFirstChild("CoinHighlight")
+                            if not highlight then
+                                highlight = Instance.new("Highlight")
+                                highlight.Name = "CoinHighlight"
+                                highlight.Parent = obj
+                            end
+                            highlight.FillColor = Color3.fromRGB(255, 150, 0)
+                            highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+                            highlight.FillTransparency = 0.5
+                            highlight.OutlineTransparency = 0
+                        end
+                    end
+                end
+            end)
+        else
+            if coinConnection then
+                coinConnection:Disconnect()
+                coinConnection = nil
+            end
+            
+            local areaDeBusca = workspace:FindFirstChild("NormalMaps") or workspace:FindFirstChild("Map") or workspace
+            for _, obj in ipairs(areaDeBusca:GetDescendants()) do
+                local highlight = obj:FindFirstChild("CoinHighlight")
+                if highlight then
+                    highlight:Destroy()
+                end
+            end
+        end
+    end
+})
 
 TeleportTab:Button({
     Title = "TP Murderer",
@@ -1610,7 +1657,7 @@ FarmTab:Toggle({
                             part.CFrame = hrp.CFrame
                             
                             -- Espera 0.05 segundos (fração rápida)
-                            task.wait(0.05)
+                            task.wait(0.01)
                             
                             -- Verifica se a arma ainda existe e devolve ela
                             if part then 
