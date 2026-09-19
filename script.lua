@@ -1,5 +1,3 @@
-Como eu faço pro auto collect coin ser assim, focar apenas em 3 moedas mais próximas para não focar em todas assim diminuindo o lag e o fly seja o msm q já tem no script o bodyVelocity da tab player e seja na velocidade 30 e eu fique 0 milésimos em cada moeda, melhor, eu passe por uma ja vou para outra e o carregamento delas sejam assim, tem 3 moedas no foco eu vou até uma coleto ela e ja procure outra 3° moeda para n bugar e ficar parado sem pegar nenhuma e quando a moeda q eu tava indo outro jogador coletar ela fazendo sumir eu va para outra mais próxima e ja carregue outra 3° (mande apenas a parte para mim substituir e onde) 
-
 local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/refs/heads/main/dist/main.lua"))()
 
 --// Window
