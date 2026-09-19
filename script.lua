@@ -1,3 +1,5 @@
+Como eu faço pro auto collect coin ser assim, focar apenas em 3 moedas mais próximas para não focar em todas assim diminuindo o lag e o fly seja o msm q já tem no script o bodyVelocity da tab player e seja na velocidade 30 e eu fique 0 milésimos em cada moeda, melhor, eu passe por uma ja vou para outra e o carregamento delas sejam assim, tem 3 moedas no foco eu vou até uma coleto ela e ja procure outra 3° moeda para n bugar e ficar parado sem pegar nenhuma e quando a moeda q eu tava indo outro jogador coletar ela fazendo sumir eu va para outra mais próxima e ja carregue outra 3° (mande apenas a parte para mim substituir e onde) 
+
 local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/refs/heads/main/dist/main.lua"))()
 
 --// Window
@@ -278,15 +280,10 @@ task.spawn(function()
 end)
 
 ---------------------------------------------------------------------------
--- [ POSIÇÃO REAL SINCRONIZADA COM O PING - ULTRA PRECISÃO ]
+-- [ POSIÇÃO REAL SINCRONIZADA COM O PING ]
 ---------------------------------------------------------------------------
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
-
--- Variáveis para armazenar o estado anterior e calcular aceleração real
-local lastVelocity = Vector3.new(0, 0, 0)
-local lastPosition = Vector3.new(0, 0, 0)
-local lastTick = tick()
 
 local function GetPredictedCFrame(targetChar)
     if not targetChar then return nil end
@@ -297,51 +294,25 @@ local function GetPredictedCFrame(targetChar)
     local humanoid = targetChar:FindFirstChildOfClass("Humanoid")
     
     if targetPart and humanoid and humanoid.Health > 0 then
-        local currentTick = tick()
-        local deltaTime = currentTick - lastTick
-        if deltaTime <= 0 then deltaTime = 0.03 end -- Evita divisão por zero
+        -- 1. Obtém o seu ping atual com o servidor (retorna em segundos)
+        local ping = LocalPlayer:GetNetworkPing()
         
-        -- 1. Obtém o ping e aplica um multiplicador de estabilização (Buffer)
-        -- Multiplicar por 1.1 ou 1.2 geralmente compensa o atraso de interpolação do próprio Roblox
-        local ping = LocalPlayer:GetNetworkPing() * 1.15
+        -- 2. Velocidade estimada do tiro da arma do Sheriff no MM2
+        local bulletSpeed = 250 
         
-        -- 2. Velocidade estimada do projétil do MM2 (ajustada para maior fidelidade física)
-        local bulletSpeed = 265 
-        
+        -- 3. Calcula a distância real entre você e o Murderer
         local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
         if myRoot then
-            local currentPosition = targetPart.Position
-            local currentVelocity = targetPart.AssemblyLinearVelocity
+            local distance = (targetPart.Position - myRoot.Position).Magnitude
             
-            -- Se a velocidade nativa sumir (comum em exploits do adversário), calculamos manualmente
-            if currentVelocity.Magnitude < 0.1 then
-                currentVelocity = (currentPosition - lastPosition) / deltaTime
-            end
-            
-            -- Calculando a aceleração (mudança de direção/velocidade súbita)
-            local acceleration = (currentVelocity - lastVelocity) / deltaTime
-            
-            -- Limita acelerações absurdas causadas por lag visual ou teleporte
-            if acceleration.Magnitude > 100 then 
-                acceleration = acceleration.Unit * 100 
-            end
-            
-            local distance = (currentPosition - myRoot.Position).Magnitude
-            
-            -- 3. Tempo estimado até o impacto
+            -- 4. O tempo total de atraso é o seu ping + o tempo que a bala leva para chegar lá
             local timeDelay = ping + (distance / bulletSpeed)
             
-            -- 4. EQUAÇÃO DE MOVIMENTO COMPLETA: Posição + (Velocidade * t) + (0.5 * Aceleração * t^2)
-            -- Isso prevê curvas, pulos e paradas bruscas com perfeição
-            local predictedPosition = currentPosition + (currentVelocity * timeDelay) + (0.5 * acceleration * (timeDelay ^ 2))
+            -- 5. Corrige a posição exata multiplicando o atraso pelo vetor de movimento real do jogador
+            local realPosition = targetPart.Position + (targetPart.AssemblyLinearVelocity * timeDelay)
             
-            -- Salva os estados atuais para o próximo frame
-            lastPosition = currentPosition
-            lastVelocity = currentVelocity
-            lastTick = currentTick
-            
-            -- Retorna a posição predita travada na altura ideal do peito/torso do alvo
-            return CFrame.new(predictedPosition)
+            -- Retorna o CFrame recalculado exatamente onde o corpo dele está no servidor agora
+            return CFrame.new(realPosition)
         end
         
         return targetPart.CFrame
@@ -590,47 +561,42 @@ local function ToggleShootButtonGui(enable)
  ShootButton.MouseButton1Down:Connect(function()
     local Character = LocalPlayer.Character
     local Backpack = LocalPlayer:FindFirstChild("Backpack")
-    local targetCFrame = cachedTargetCFrame
+    
+    -- Busca o Murderer e pega a posição dele APENAS neste momento do clique
+    local murderer = GetMurdererPlayer()
+    local targetCFrame = nil
+    
+    if murderer and murderer.Character then
+        targetCFrame = GetPredictedCFrame(murderer.Character)
+    end
     
     if Character and Backpack and targetCFrame then
         local gunInBackpack = Backpack:FindFirstChild("Gun")
         local gunInChar = Character:FindFirstChild("Gun")
         
-        -- 1. Equipamento instantâneo da arma
+        -- Equipa a arma se ela estiver na mochila
         if gunInBackpack and not gunInChar then
-            local humanoid = Character:FindFirstChildOfClass("Humanoid")
-            if humanoid then
-                humanoid:EquipTool(gunInBackpack)
-                gunInChar = gunInBackpack
-                -- Pequena pausa para o servidor do MM2 registrar que a arma foi puxada com sucesso
-                task.wait(0.05) 
-            end
+            gunInBackpack.Parent = Character
+            gunInChar = gunInBackpack
         end
 
-        -- 2. Execução do disparo calibrado
+        -- Dispara o tiro diretamente para a posição capturada
         if gunInChar then
             local shootEvent = gunInChar:FindFirstChild("Shoot")
+            local handle = gunInChar:FindFirstChild("Handle")
             local myHRP = Character:FindFirstChild("HumanoidRootPart")
             
-            if shootEvent and shootEvent:IsA("RemoteEvent") and myHRP then
-                -- O MM2 espera que a origem seja a posição atual do jogador ou da arma
-                local originPos = myHRP.CFrame
-                
-                -- Dispara o evento passando a posição tridimensional calculada no frame atual
+            if shootEvent and shootEvent:IsA("RemoteEvent") then
+                local originPos = handle and handle.CFrame or (myHRP and myHRP.CFrame) or CFrame.new()
                 shootEvent:FireServer(originPos, targetCFrame)
             end
         end
         
-        -- 3. Guarda a arma de forma segura após a confirmação do disparo pelo servidor
-        task.delay(0.12, function()
+        -- Guarda a arma após o disparo
+        task.delay(0.01, function()
             local currentGun = Character:FindFirstChild("Gun")
             if currentGun then
-                local humanoid = Character:FindFirstChildOfClass("Humanoid")
-                if humanoid then
-                    humanoid:UnequipTools()
-                else
-                    currentGun.Parent = Backpack
-                end
+                currentGun.Parent = Backpack
             end
         end)
     end
@@ -745,11 +711,8 @@ RunService.Stepped:Connect(function()
 end)
 
 ---------------------------------------------------------------------------
--- [ AUTO COIN VOO DIRETO E TOTALMENTE POR EVENTOS ]
+-- [ AUTO COIN COM RADAR E ROTA FIXA ]
 ---------------------------------------------------------------------------
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-
 local function IsCoinValid(coin)
     return coin 
         and coin.Parent 
@@ -758,30 +721,11 @@ local function IsCoinValid(coin)
         and coin:IsDescendantOf(workspace)
 end
 
--- Confirma que o round começou (Murderer ou Sheriff receberam arma)
-local function HasRoundStarted()
-    for _, player in ipairs(Players:GetPlayers()) do
-        local char = player.Character
-        local backpack = player:FindFirstChild("Backpack")
-        
-        if char and (char:FindFirstChild("Knife") or char:FindFirstChild("Gun") or char:FindFirstChild("Revolver")) then
-            return true
-        end
-        if backpack and (backpack:FindFirstChild("Knife") or backpack:FindFirstChild("Gun") or backpack:FindFirstChild("Revolver")) then
-            return true
-        end
-    end
-    return false
-end
+local function GetClosestCoin(centerPos, maxRadius)
+    local menorDistancia = maxRadius or math.huge
+    local moedaAlvo = nil
 
-local function GetMapContainer()
-    return workspace:FindFirstChild("NormalMaps") or workspace:FindFirstChild("Map") or workspace
-end
-
-local function GetClosestCoin(centerPos)
-    local moedaMaisProxima = nil
-    local menorDistancia = math.huge
-    local areaDeBusca = GetMapContainer()
+    local areaDeBusca = workspace:FindFirstChild("NormalMaps") or workspace:FindFirstChild("Map") or workspace
 
     for _, obj in ipairs(areaDeBusca:GetDescendants()) do
         if obj:IsA("BasePart") and IsCoinValid(obj) and obj.CanCollide == false then
@@ -791,81 +735,38 @@ local function GetClosestCoin(centerPos)
                     local model = obj:FindFirstAncestorOfClass("Model")
                     if model and not model:FindFirstChild("Lobby") then
                         local dist = (centerPos - obj.Position).Magnitude
-                        if dist < menorDistancia then
+                        if dist <= menorDistancia then
                             menorDistancia = dist
-                            moedaMaisProxima = obj
+                            moedaAlvo = obj
                         end
                     end
                 end
             end
         end
     end
-    return moedaMaisProxima
+    return moedaAlvo
 end
 
+local currentCoinTween = nil
+
 task.spawn(function()
-    local coinBodyVelocity = nil
-    local coinBodyGyro = nil
-    
     while true do
         task.wait(0.2)
         
-        if AutoCoinEnabled and HasRoundStarted() then
+        while AutoCoinEnabled do
             local char = LocalPlayer.Character
             local hrp = char and char:FindFirstChild("HumanoidRootPart")
             local hum = char and char:FindFirstChildOfClass("Humanoid")
             
             if hrp and hum and hum.Health > 0 and IsParticipatingAndAlive(LocalPlayer) then
-                local alvo = GetClosestCoin(hrp.Position)
+                
+                local alvo = GetClosestCoin(hrp.Position, 100)
                 
                 if not alvo then
-                    -- Garante que o personagem pare de se mover se as moedas acabarem
-                    if coinBodyVelocity then coinBodyVelocity.Velocity = Vector3.zero end
-
-                    -- [ PAUSA TOTAL ]: Não procura moedas, apenas dorme até o jogo criar uma nova
-                    local areaDeBusca = GetMapContainer()
-                    local moedaSpawada = false
-                    
-                    local waitConnection = areaDeBusca.DescendantAdded:Connect(function(obj)
-                        if obj:IsA("BasePart") and IsCoinValid(obj) then
-                            local nome = string.lower(obj.Name)
-                            if nome:find("coin") or nome:find("gold") or nome:find("token") then
-                                moedaSpawada = true
-                            end
-                        end
-                    end)
-                    
-                    -- Fica travado aqui dormindo (0 lag) até a moeda nascer ou a partida acabar
-                    repeat
-                        task.wait(0.5) 
-                    until moedaSpawada or not AutoCoinEnabled or not HasRoundStarted()
-                    
-                    if waitConnection then waitConnection:Disconnect() end
-                else
-                    local areaDeBusca = GetMapContainer()
-                    local moedaSumiu = false
-                    
-                    -- [ EVENTO ]: Se alguém pegar a moeda antes de você, ele quebra o voo na hora
-                    local ancestryConn = alvo.AncestryChanged:Connect(function(_, parent)
-                        if not parent then moedaSumiu = true end
-                    end)
-
-                    -- [ EVENTO ]: Se nascer uma moeda mais perto no meio do seu voo, ele vira pra ela
-                    local spawnConn = areaDeBusca.DescendantAdded:Connect(function(obj)
-                        if obj:IsA("BasePart") and IsCoinValid(obj) and obj.CanCollide == false then
-                            local nome = string.lower(obj.Name)
-                            if nome:find("coin") or nome:find("gold") or nome:find("token") then
-                                if hrp and alvo and IsCoinValid(alvo) then
-                                    local distNova = (hrp.Position - obj.Position).Magnitude
-                                    local distAtual = (hrp.Position - alvo.Position).Magnitude
-                                    if distNova < distAtual then
-                                        alvo = obj
-                                    end
-                                end
-                            end
-                        end
-                    end)
-
+                    alvo = GetClosestCoin(hrp.Position, math.huge)
+                end
+                
+                if alvo then
                     local noclipConnection = RunService.Stepped:Connect(function()
                         if char then
                             for _, part in ipairs(char:GetChildren()) do
@@ -874,58 +775,71 @@ task.spawn(function()
                         end
                     end)
                     
-                    if not coinBodyVelocity or not coinBodyVelocity.Parent then
-                        coinBodyVelocity = Instance.new("BodyVelocity")
-                        coinBodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-                        coinBodyVelocity.Parent = hrp
-                    end
-                    if not coinBodyGyro or not coinBodyGyro.Parent then
-                        coinBodyGyro = Instance.new("BodyGyro")
-                        coinBodyGyro.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
-                        coinBodyGyro.P = 100000
-                        coinBodyGyro.Parent = hrp
-                    end
+                    local bv = Instance.new("BodyVelocity")
+                    bv.MaxForce = Vector3.new(1e6, 1e6, 1e6)
+                    bv.Velocity = Vector3.zero
+                    bv.Parent = hrp
 
-                    hum.PlatformStand = true
+                    local spawnDestino = alvo.Position
+                    if alvo.Parent and alvo.Parent:IsA("Model") and alvo.Parent.PrimaryPart then
+                        spawnDestino = alvo.Parent.PrimaryPart.Position
+                    elseif alvo.Name == "Coin_Sub" and alvo.Parent and alvo.Parent:FindFirstChild("Coin") then
+                        spawnDestino = alvo.Parent.Coin.Position
+                    end
                     
-                    while AutoCoinEnabled and IsCoinValid(alvo) and not moedaSumiu and HasRoundStarted() do
-                        local spawnDestino = alvo.Position
-                        if alvo.Parent and alvo.Parent:IsA("Model") and alvo.Parent.PrimaryPart then
-                            spawnDestino = alvo.Parent.PrimaryPart.Position
-                        elseif alvo.Name == "Coin_Sub" and alvo.Parent and alvo.Parent:FindFirstChild("Coin") then
-                            spawnDestino = alvo.Parent.Coin.Position
-                        end
-                        
-                        local destinoFinal = Vector3.new(spawnDestino.X, spawnDestino.Y + 1.2, spawnDestino.Z)
+                    local destinoFinal = Vector3.new(spawnDestino.X, spawnDestino.Y + 1.2, spawnDestino.Z)
+                    
+                    local atualPos = hrp.Position
+                    local distancia = (atualPos - destinoFinal).Magnitude
+                    local tempoViagem = math.max(0.05, distancia / AutoCoinSpeed)
+                    
+                    if currentCoinTween then
+                        currentCoinTween:Cancel()
+                    end
+                    
+                    local tweenInfo = TweenInfo.new(tempoViagem, Enum.EasingStyle.Linear)
+                    currentCoinTween = TweenService:Create(hrp, tweenInfo, {CFrame = CFrame.new(destinoFinal)})
+                    currentCoinTween:Play()
+                    
+                    local tempoEsperado = tick() + tempoViagem
+                    
+                    while AutoCoinEnabled do
                         local currentPos = hrp.Position
-                        local direction = (destinoFinal - currentPos)
+                        local distToTarget = (currentPos - destinoFinal).Magnitude
                         
-                        if direction.Magnitude <= 2.5 then 
-                            Coletadas[alvo] = true
-                            break 
+                        if distToTarget <= 0.8 or tick() >= tempoEsperado then 
+                            break
                         end
-
-                        if coinBodyVelocity then coinBodyVelocity.Velocity = direction.Unit * 25 end
-                        if coinBodyGyro then coinBodyGyro.CFrame = CFrame.new(currentPos, destinoFinal) end
-                        
                         RunService.Heartbeat:Wait()
                     end
 
-                    -- [ CORREÇÃO AQUI ]: Trava o personagem no ar imediatamente quando a moeda some ou é pega
-                    if coinBodyVelocity then coinBodyVelocity.Velocity = Vector3.zero end
+                    if currentCoinTween then
+                        currentCoinTween:Cancel()
+                        currentCoinTween = nil
+                    end
+                    
+                    hrp.AssemblyLinearVelocity = Vector3.zero
+                    hrp.AssemblyAngularVelocity = Vector3.zero
+                    if bv then 
+                        bv.Velocity = Vector3.zero 
+                    end
+                    
+                    if alvo and alvo.Parent then
+                        Coletadas[alvo] = true
+                    end
+                    
+                    task.wait(TempoNaMoeda)
 
-                    if ancestryConn then ancestryConn:Disconnect() end
-                    if spawnConn then spawnConn:Disconnect() end
                     if noclipConnection then noclipConnection:Disconnect() end
+                    if bv then bv:Destroy() end
+
+                    if not AutoCoinEnabled then break end
+                else
+                    task.wait(1)
                 end
+            else
+                task.wait(0.5)
             end
-        else
-            -- Limpa os efeitos e desativa o modo avião assim que o round acaba ou o AutoCoin é desligado
-            if coinBodyVelocity then coinBodyVelocity:Destroy() coinBodyVelocity = nil end
-            if coinBodyGyro then coinBodyGyro:Destroy() coinBodyGyro = nil end
-            local char = LocalPlayer.Character
-            local hum = char and char:FindFirstChildOfClass("Humanoid")
-            if hum then hum.PlatformStand = false end
         end
     end
 end)
@@ -1902,9 +1816,9 @@ PerformanceTab:Toggle({
                         end
                     end
                     
-                    -- Pausa rápida a cada 1000 peças processadas para o jogo não travar (anti-lag)
+                    -- Pausa rápida a cada 100 peças processadas para o jogo não travar (anti-lag)
                     count = count + 1
-                    if count % 1000 == 0 then
+                    if count % 100 == 0 then
                         task.wait()
                     end
                 end
@@ -2073,9 +1987,9 @@ ghostToggle = PerformanceTab:Toggle({
                 for _, part in ipairs(ghostClone:GetDescendants()) do
                     if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" and part.Name ~= "CollisionBox" then
                         part.LocalTransparencyModifier = 0
-                        part.Transparency = 0.8
+                        part.Transparency = 0.5
                     elseif part:IsA("Decal") or part:IsA("Texture") then
-                        part.Transparency = 0.8
+                        part.Transparency = 0.5
                     end
                 end
             end)
