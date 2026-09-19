@@ -141,7 +141,7 @@ WindUI:SetTheme("Dark")
 local InfoTab = Window:Tab({Title = "Info", Icon = "house"})
 local CombatTab = Window:Tab({Title = "Combate", Icon = "sword"})
 local FlingTab = Window:Tab({Title = "Fling", Icon = "wind"})
-local EspTab = Window:Tab({Title = "ESP", Icon = "eye"})
+local EspTab = Window:Tab({Title = "Visual", Icon = "eye"})
 local TeleportTab = Window:Tab({Title = "Teleportes", Icon = "map-pinned"})
 local FarmTab = Window:Tab({Title = "Farm", Icon = "coins"})
 local PlayerTab = Window:Tab({Title = "Player", Icon = "user"})
@@ -278,13 +278,14 @@ task.spawn(function()
 end)
 
 ---------------------------------------------------------------------------
--- [ POSIÇÃO REAL SINCRONIZADA COM O PING ]
+-- [ POSIÇÃO SERVIDOR - AUTO-RESET POR RODADA & ANTI-BUG ]
 ---------------------------------------------------------------------------
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 
 local function GetPredictedCFrame(targetChar)
-    if not targetChar then return nil end
+    -- Verifica se o personagem realmente existe e está no mapa visível (não destruído)
+    if not targetChar or not targetChar:IsDescendantOf(workspace) then return nil end
     
     local targetPart = targetChar:FindFirstChild("HumanoidRootPart") 
         or targetChar:FindFirstChild("UpperTorso") 
@@ -292,24 +293,34 @@ local function GetPredictedCFrame(targetChar)
     local humanoid = targetChar:FindFirstChildOfClass("Humanoid")
     
     if targetPart and humanoid and humanoid.Health > 0 then
-        -- 1. Obtém o seu ping atual com o servidor (retorna em segundos)
-        local ping = LocalPlayer:GetNetworkPing()
+        -- 1. Corrige o bug do Roblox onde GetNetworkPing() às vezes retorna 0 ou negativo em exploits
+        local rawPing = LocalPlayer:GetNetworkPing()
+        if rawPing <= 0 then rawPing = 0.05 end -- Valor padrão seguro (50ms) caso a API falhe
+        local ping = rawPing * 0.9
         
-        -- 2. Velocidade estimada do tiro da arma do Sheriff no MM2
+        -- 2. Velocidade padrão do projétil do Sheriff
         local bulletSpeed = 250 
         
-        -- 3. Calcula a distância real entre você e o Murderer
         local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-        if myRoot then
+        if myRoot and myRoot:IsDescendantOf(workspace) then
+            local velocity = targetPart.AssemblyLinearVelocity
             local distance = (targetPart.Position - myRoot.Position).Magnitude
             
-            -- 4. O tempo total de atraso é o seu ping + o tempo que a bala leva para chegar lá
-            local timeDelay = ping + (distance / bulletSpeed)
+            -- 3. Proteção contra velocidade alterada (glitch ou exploit do murderer)
+            if velocity.Magnitude > 50 then
+                velocity = velocity.Unit * 16
+            end
             
-            -- 5. Corrige a posição exata multiplicando o atraso pelo vetor de movimento real do jogador
-            local realPosition = targetPart.Position + (targetPart.AssemblyLinearVelocity * timeDelay)
+            -- 4. Cálculo dinâmico de distância/tempo
+            local bulletTravelTime = distance / bulletSpeed
+            local timeDelay = ping + bulletTravelTime
             
-            -- Retorna o CFrame recalculado exatamente onde o corpo dele está no servidor agora
+            -- 5. Se estiver muito colado, ignora a predição para acertar a hitbox crua do servidor
+            if distance < 14 then
+                timeDelay = ping * 0.4
+            end
+            
+            local realPosition = targetPart.Position + (velocity * timeDelay)
             return CFrame.new(realPosition)
         end
         
@@ -319,16 +330,22 @@ local function GetPredictedCFrame(targetChar)
     return nil
 end
 
--- NÃO APAGUE ESTE LOOP: Ele é responsável por atualizar a mira constantemente
+-- LOOPER COMPLETAMENTE REFEITO PARA RESETAR A CADA FRAME REAL DO JOGO
 task.spawn(function()
     while true do
-        local murderer = GetMurdererPlayer()
-        if murderer and murderer.Character then
+        -- Força a busca pelo Murderer atualizado direto da função global do seu script
+        local murderer = typeof(GetMurdererPlayer) == "function" and GetMurdererPlayer() or nil
+        
+        if murderer and murderer.Character and murderer.Character:FindFirstChild("HumanoidRootPart") then
+            -- Garante que estamos pegando a versão viva e atual do boneco do jogador
             cachedTargetCFrame = GetPredictedCFrame(murderer.Character)
         else
+            -- Limpa o cache se o Murderer morreu ou a rodada acabou, evitando puxar dados velhos
             cachedTargetCFrame = nil
         end
-        task.wait() -- Sincronização em tempo real frame por frame
+        
+        -- Trocar task.wait() puro por renderização limpa garante que rode sincronizado com a tela
+        game:GetService("RunService").Heartbeat:Wait()
     end
 end)
 
@@ -556,48 +573,53 @@ local function ToggleShootButtonGui(enable)
             end
         end)
 
- ShootButton.MouseButton1Down:Connect(function()
+ShootButton.MouseButton1Down:Connect(function()
     local Character = LocalPlayer.Character
     local Backpack = LocalPlayer:FindFirstChild("Backpack")
     
-    -- Busca o Murderer e pega a posição dele APENAS neste momento do clique
-    local murderer = GetMurdererPlayer()
-    local targetCFrame = nil
+    if not Character or not Backpack then return end
+
+    -- Usamos o cachedTargetCFrame atualizado em tempo real pelo loop global
+    local targetCFrame = cachedTargetCFrame 
     
-    if murderer and murderer.Character then
-        targetCFrame = GetPredictedCFrame(murderer.Character)
+    -- Busca de emergência se o cache estiver vazio
+    if not targetCFrame then
+        local murderer = typeof(GetMurdererPlayer) == "function" and GetMurdererPlayer() or nil
+        if murderer and murderer.Character then
+            targetCFrame = GetPredictedCFrame(murderer.Character)
+        end
     end
     
-    if Character and Backpack and targetCFrame then
-        local gunInBackpack = Backpack:FindFirstChild("Gun")
-        local gunInChar = Character:FindFirstChild("Gun")
-        
-        -- Equipa a arma se ela estiver na mochila
-        if gunInBackpack and not gunInChar then
-            gunInBackpack.Parent = Character
-            gunInChar = gunInBackpack
+    if not targetCFrame then return end
+
+    local gunInBackpack = Backpack:FindFirstChild("Gun")
+    local gunInChar = Character:FindFirstChild("Gun")
+    local gun = gunInChar or gunInBackpack
+
+    if gun then
+        -- 1. Equipa a arma se ela estiver na mochila
+        if gun.Parent == Backpack then
+            gun.Parent = Character
+            -- Micro atraso físico do próprio Roblox para estabilizar a mão do personagem
+            task.wait(0.08) 
         end
 
-        -- Dispara o tiro diretamente para a posição capturada
-        if gunInChar then
-            local shootEvent = gunInChar:FindFirstChild("Shoot")
-            local handle = gunInChar:FindFirstChild("Handle")
-            local myHRP = Character:FindFirstChild("HumanoidRootPart")
-            
-            if shootEvent and shootEvent:IsA("RemoteEvent") then
-                local originPos = handle and handle.CFrame or (myHRP and myHRP.CFrame) or CFrame.new()
-                shootEvent:FireServer(originPos, targetCFrame)
-            end
-        end
+        -- 2. DISPARO ORIGINAL (Volta a enviar os CFrames como no seu script inicial)
+        local shootEvent = gun:FindFirstChild("Shoot")
+        local handle = gun:FindFirstChild("Handle")
+        local myHRP = Character:FindFirstChild("HumanoidRootPart")
         
-        -- Guarda a arma após o disparo
-        task.delay(0.01, function()
-            local currentGun = Character:FindFirstChild("Gun")
-            if currentGun then
-                currentGun.Parent = Backpack
-            end
-        end)
+        if shootEvent and shootEvent:IsA("RemoteEvent") then
+            -- Define o CFrame de origem exato (exatamente como estava no seu código antigo)
+            local originCFrame = handle and handle.CFrame or (myHRP and myHRP.CFrame) or CFrame.new()
+            
+            -- Envia os dados nativos que o servidor do MM2 espera receber
+            shootEvent:FireServer(originCFrame, targetCFrame)
+        end
     end
+    
+    -- [A SUA IDÉIA]: O bloco de código que guardava a arma (currentGun.Parent = Backpack) 
+    -- foi completamente removido daqui. A arma continua na mão após o tiro.
 end)
 
         ShootButtonGui = ScreenGui
