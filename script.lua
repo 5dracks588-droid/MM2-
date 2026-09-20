@@ -1771,7 +1771,7 @@ PerformanceTab:Toggle({
 }) 
 
 local XRayEnabled = false
-local TransparenciasOriginais = {} -- Guarda o estado original do mapa
+local PropriedadesOriginais = {} -- Guarda transparência e material originais
 
 PerformanceTab:Toggle({
     Title = "X-Ray",
@@ -1780,50 +1780,76 @@ PerformanceTab:Toggle({
         XRayEnabled = Value
         
         if XRayEnabled then
-            -- Ativando o X-Ray
+            -- Loop contínuo para atualizar dinamicamente conforme você anda pelo mapa
             task.spawn(function()
-                local count = 0
-                for _, obj in ipairs(workspace:GetDescendants()) do
-                    if obj:IsA("BasePart") or obj:IsA("Decal") or obj:IsA("Texture") then
+                while XRayEnabled do
+                    local char = game.Players.LocalPlayer.Character
+                    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                    
+                    if hrp then
+                        local myPos = hrp.Position
+                        local count = 0
                         
-                        -- Verifica se a peça pertence ao personagem de algum jogador
-                        local eDeJogador = false
-                        local atual = obj
-                        while atual and atual ~= workspace do
-                            if game.Players:GetPlayerFromCharacter(atual) then
-                                eDeJogador = true
-                                break
-                            end
-                            atual = atual.Parent
-                        end
-                        
-                        -- Se não for jogador e o bloco for totalmente visível (Transparência == 0)
-                        if not eDeJogador and obj.Transparency == 0 then
-                            -- Salva a transparência original
-                            if TransparenciasOriginais[obj] == nil then
-                                TransparenciasOriginais[obj] = obj.Transparency
+                        for _, obj in ipairs(workspace:GetDescendants()) do
+                            if not XRayEnabled then break end
+                            
+                            if obj:IsA("BasePart") then
+                                -- Verifica se a peça pertence a algum jogador (você ou outros)
+                                local eDeJogador = false
+                                local atual = obj
+                                while atual and atual ~= workspace do
+                                    if game.Players:GetPlayerFromCharacter(atual) then
+                                        eDeJogador = true
+                                        break
+                                    end
+                                    atual = atual.Parent
+                                end
+                                
+                                if not eDeJogador then
+                                    -- Salva o estado original na primeira leitura (apenas blocos com transparência 0)
+                                    if PropriedadesOriginais[obj] == nil and obj.Transparency == 0 then
+                                        PropriedadesOriginais[obj] = {
+                                            Transparency = obj.Transparency,
+                                            Material = obj.Material
+                                        }
+                                    end
+                                    
+                                    -- Se o bloco for um dos afetados
+                                    local props = PropriedadesOriginais[obj]
+                                    if props then
+                                        -- Muda o material para SmoothPlastic
+                                        obj.Material = Enum.Material.SmoothPlastic
+                                        
+                                        -- Calcula a distância em tempo real
+                                        local dist = (obj.Position - myPos).Magnitude
+                                        
+                                        if dist <= 200 then
+                                            obj.Transparency = 0.8 -- Dentro do raio de 200 studs
+                                        else
+                                            obj.Transparency = 1   -- Fora do raio de 200 studs
+                                        end
+                                    end
+                                end
                             end
                             
-                            -- Aplica o X-Ray apenas nesses blocos
-                            obj.Transparency = 0.8
+                            count = count + 1
+                            if count % 150 == 0 then
+                                task.wait()
+                            end
                         end
                     end
                     
-                    -- Pausa rápida a cada 100 peças processadas para o jogo não travar (anti-lag)
-                    count = count + 1
-                    if count % 100 == 0 then
-                        task.wait()
-                    end
+                    task.wait(0.2) -- Atualiza as posições a cada 0.2 segundos enquanto você anda
                 end
             end)
         else
-            -- Desativando o X-Ray (Restaurando o mapa)
+            -- Desativando o X-Ray (Restaura transparência e material originais)
             task.spawn(function()
                 local count = 0
-                for obj, transOriginal in pairs(TransparenciasOriginais) do
-                    -- Verifica se a peça ainda existe no mapa antes de alterar
+                for obj, props in pairs(PropriedadesOriginais) do
                     if obj and obj.Parent then
-                        obj.Transparency = transOriginal
+                        obj.Transparency = props.Transparency
+                        obj.Material = props.Material
                     end
                     
                     count = count + 1
@@ -1831,8 +1857,7 @@ PerformanceTab:Toggle({
                         task.wait()
                     end
                 end
-                -- Limpa a memória depois de restaurar
-                TransparenciasOriginais = {}
+                PropriedadesOriginais = {}
             end)
         end
     end
