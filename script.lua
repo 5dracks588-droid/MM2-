@@ -278,78 +278,6 @@ task.spawn(function()
 end)
 
 ---------------------------------------------------------------------------
--- [ POSIÇÃO SERVIDOR - AUTO-RESET POR RODADA & ANTI-BUG ]
----------------------------------------------------------------------------
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
-
-local function GetPredictedCFrame(targetChar)
-    -- Verifica se o personagem realmente existe e está no mapa visível (não destruído)
-    if not targetChar or not targetChar:IsDescendantOf(workspace) then return nil end
-    
-    local targetPart = targetChar:FindFirstChild("HumanoidRootPart") 
-        or targetChar:FindFirstChild("UpperTorso") 
-        or targetChar:FindFirstChild("Torso")
-    local humanoid = targetChar:FindFirstChildOfClass("Humanoid")
-    
-    if targetPart and humanoid and humanoid.Health > 0 then
-        -- 1. Corrige o bug do Roblox onde GetNetworkPing() às vezes retorna 0 ou negativo em exploits
-        local rawPing = LocalPlayer:GetNetworkPing()
-        if rawPing <= 0 then rawPing = 0.05 end -- Valor padrão seguro (50ms) caso a API falhe
-        local ping = rawPing * 0.9
-        
-        -- 2. Velocidade padrão do projétil do Sheriff
-        local bulletSpeed = 250 
-        
-        local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-        if myRoot and myRoot:IsDescendantOf(workspace) then
-            local velocity = targetPart.AssemblyLinearVelocity
-            local distance = (targetPart.Position - myRoot.Position).Magnitude
-            
-            -- 3. Proteção contra velocidade alterada (glitch ou exploit do murderer)
-            if velocity.Magnitude > 50 then
-                velocity = velocity.Unit * 16
-            end
-            
-            -- 4. Cálculo dinâmico de distância/tempo
-            local bulletTravelTime = distance / bulletSpeed
-            local timeDelay = ping + bulletTravelTime
-            
-            -- 5. Se estiver muito colado, ignora a predição para acertar a hitbox crua do servidor
-            if distance < 14 then
-                timeDelay = ping * 0.4
-            end
-            
-            local realPosition = targetPart.Position + (velocity * timeDelay)
-            return CFrame.new(realPosition)
-        end
-        
-        return targetPart.CFrame
-    end
-
-    return nil
-end
-
--- LOOPER COMPLETAMENTE REFEITO PARA RESETAR A CADA FRAME REAL DO JOGO
-task.spawn(function()
-    while true do
-        -- Força a busca pelo Murderer atualizado direto da função global do seu script
-        local murderer = typeof(GetMurdererPlayer) == "function" and GetMurdererPlayer() or nil
-        
-        if murderer and murderer.Character and murderer.Character:FindFirstChild("HumanoidRootPart") then
-            -- Garante que estamos pegando a versão viva e atual do boneco do jogador
-            cachedTargetCFrame = GetPredictedCFrame(murderer.Character)
-        else
-            -- Limpa o cache se o Murderer morreu ou a rodada acabou, evitando puxar dados velhos
-            cachedTargetCFrame = nil
-        end
-        
-        -- Trocar task.wait() puro por renderização limpa garante que rode sincronizado com a tela
-        game:GetService("RunService").Heartbeat:Wait()
-    end
-end)
-
----------------------------------------------------------------------------
 -- [ SILENT AIM (METATABLE HOOK) ]
 ---------------------------------------------------------------------------
 pcall(function()
@@ -573,54 +501,99 @@ local function ToggleShootButtonGui(enable)
             end
         end)
 
-ShootButton.MouseButton1Down:Connect(function()
-    local Character = LocalPlayer.Character
-    local Backpack = LocalPlayer:FindFirstChild("Backpack")
-    
-    if not Character or not Backpack then return end
+                ---------------------------------------------------------------------------
+        -- [ DISPARO COM PREVISÃO DE MOVIMENTO E VERIFICAÇÃO DE PAREDE ]
+        ---------------------------------------------------------------------------
+        ShootButton.MouseButton1Down:Connect(function()
+            local Character = LocalPlayer.Character
+            local Backpack = LocalPlayer:FindFirstChild("Backpack")
+            if not Character or not Backpack then return end
 
-    -- Usamos o cachedTargetCFrame atualizado em tempo real pelo loop global
-    local targetCFrame = cachedTargetCFrame 
-    
-    -- Busca de emergência se o cache estiver vazio
-    if not targetCFrame then
-        local murderer = typeof(GetMurdererPlayer) == "function" and GetMurdererPlayer() or nil
-        if murderer and murderer.Character then
-            targetCFrame = GetPredictedCFrame(murderer.Character)
-        end
-    end
-    
-    if not targetCFrame then return end
+            local gunInBackpack = Backpack:FindFirstChild("Gun")
+            local gunInChar = Character:FindFirstChild("Gun")
+            local gun = gunInChar or gunInBackpack
 
-    local gunInBackpack = Backpack:FindFirstChild("Gun")
-    local gunInChar = Character:FindFirstChild("Gun")
-    local gun = gunInChar or gunInBackpack
+            if gun then
+                -- Equipa a arma automaticamente se estiver na mochila
+                if gun.Parent == Backpack then
+                    gun.Parent = Character
+                end
 
-    if gun then
-        -- 1. Equipa a arma se ela estiver na mochila
-        if gun.Parent == Backpack then
-            gun.Parent = Character
-            -- Micro atraso físico do próprio Roblox para estabilizar a mão do personagem
-            task.wait(0.08) 
-        end
+                task.wait(0.005)
 
-        -- 2. DISPARO ORIGINAL (Volta a enviar os CFrames como no seu script inicial)
-        local shootEvent = gun:FindFirstChild("Shoot")
-        local handle = gun:FindFirstChild("Handle")
-        local myHRP = Character:FindFirstChild("HumanoidRootPart")
-        
-        if shootEvent and shootEvent:IsA("RemoteEvent") then
-            -- Define o CFrame de origem exato (exatamente como estava no seu código antigo)
-            local originCFrame = handle and handle.CFrame or (myHRP and myHRP.CFrame) or CFrame.new()
-            
-            -- Envia os dados nativos que o servidor do MM2 espera receber
-            shootEvent:FireServer(originCFrame, targetCFrame)
-        end
-    end
-    
-    -- [A SUA IDÉIA]: O bloco de código que guardava a arma (currentGun.Parent = Backpack) 
-    -- foi completamente removido daqui. A arma continua na mão após o tiro.
-end)
+                local murderer = typeof(GetMurdererPlayer) == "function" and GetMurdererPlayer() or nil
+                if not murderer or not murderer.Character then return end
+
+                local targetPart = murderer.Character:FindFirstChild("HumanoidRootPart") 
+                    or murderer.Character:FindFirstChild("UpperTorso") 
+                    or murderer.Character:FindFirstChild("Torso")
+                local humanoid = murderer.Character:FindFirstChildOfClass("Humanoid")
+                local myRoot = Character:FindFirstChild("HumanoidRootPart")
+                
+                if targetPart and humanoid and humanoid.Health > 0 and myRoot then
+                    local shootEvent = gun:FindFirstChild("Shoot")
+                    
+                    if shootEvent and shootEvent:IsA("RemoteEvent") then
+                        local targetPos = targetPart.Position
+                        local myPos = myRoot.Position
+                        
+                        -- Cria o Raycast para checar se tem blocos no caminho
+                        local rayDirection = targetPos - myPos
+                        local rayParams = RaycastParams.new()
+                        rayParams.FilterType = Enum.RaycastFilterType.Exclude
+                        rayParams.FilterDescendantsInstances = {Character} -- Ignora a nós mesmos no raio
+                        
+                        local rayResult = workspace:Raycast(myPos, rayDirection, rayParams)
+                        local caminhoLivre = false
+                        
+                        -- Verifica se o raio atingiu o Murderer ou se não bateu em nada
+                        if rayResult then
+                            if rayResult.Instance:IsDescendantOf(murderer.Character) then
+                                caminhoLivre = true
+                            end
+                        else
+                            caminhoLivre = true
+                        end
+                        
+                        if caminhoLivre then
+                            -- KILL AURA MELHORADA (Acompanha o movimento do alvo)
+                            local velocity = targetPart.AssemblyLinearVelocity
+                            local direction
+                            
+                            -- Verifica se ele está se movendo (velocidade maior que 2)
+                            if velocity.Magnitude > 2 then
+                                direction = velocity.Unit 
+                            else
+                                direction = targetPart.CFrame.LookVector 
+                            end
+                            
+                            -- O tiro nasce 4 pinos atrás da direção do movimento e vai 10 pinos para frente
+                            local originPos = targetPos - (direction * 4)
+                            local targetFinalPos = targetPos + (direction * 10)
+                            
+                            local fakeOrigin = CFrame.new(originPos)
+                            local fakeTarget = CFrame.new(targetFinalPos)
+                            
+                            shootEvent:FireServer(fakeOrigin, fakeTarget)
+                        else
+                            -- TIRO NORMAL (Murderer atrás de um bloco)
+                            local realOrigin = CFrame.new(myPos)
+                            local realTarget = CFrame.new(targetPos)
+                            
+                            shootEvent:FireServer(realOrigin, realTarget)
+                        end
+
+                        -- Corta a animação de tiro para não bugar o personagem
+                        task.spawn(function()
+                            for i = 1, 5 do
+                                PararAnimacoesDeTiro(Character)
+                                game:GetService("RunService").Heartbeat:Wait()
+                            end
+                        end)
+                    end
+                end
+            end
+        end)
 
         ShootButtonGui = ScreenGui
     else
